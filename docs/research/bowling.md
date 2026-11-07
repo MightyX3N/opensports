@@ -55,7 +55,59 @@ Wii Sports Resort ships a byte-identical bowling tuning table, so the same model
 | `0xCC` | 30 | Frames of stillness needed |
 | `0xD0` | 0.06 | Stillness threshold (g) |
 
-Still to do: the rest of the table, the ball–pin physics, the lane's oil/friction model, and the CPU bowlers.
+Still to do: the rest of the table and the CPU bowlers.
+
+## Physics
+
+### Units and steps
+
+- **1 unit ≈ 10 cm.** The ball radius is 1.075, and the pin deck starts at z = −192 (about 19.2 m from the player). The pit is at z ≈ −200.
+- **4 physics sub-steps per frame** at 60 fps (2 in some cases), so 240 steps a second.
+- Velocities are stored as **distance per step**, not per second.
+
+### Rigid-body step (shared physics library, used by ball and pins)
+
+Each step, in this order:
+
+1. **Sleep check:** if both linear speed and spin are under a threshold, the body is put to rest (velocities zeroed). The spin threshold is the linear one divided by a ratio.
+2. **Drag:** velocity and spin each lose a fixed fraction (`v -= v × drag`).
+3. **Gravity:** a constant is subtracted from vertical velocity.
+4. **Move:** `position += velocity` (semi-implicit Euler).
+5. **Rotate:** the orientation matrix is turned by the spin, then re-orthonormalised with cross products, with a fallback for degenerate cases.
+
+The physics engine is small and fixed-step, with no solver iterations. Stability comes from the sub-steps, the drag and the sleep threshold.
+
+### The roll and the pin deck
+
+- **Rolling ball:** the ball's drag is swapped to **0.002** under some conditions, most likely the oiled part of the lane, where a real ball skids instead of hooking. It's restored afterwards.
+- **Gutter:** the ball is flagged as a gutter ball once it drifts sideways past a set distance from the lane centre.
+- **Pin deck:** the game switches state when the ball passes z = −192. From then on, ball–pin, pin–pin and pin–floor collisions run every sub-step.
+- **Settling trick:** about **1 second** after the ball reaches the pins, pin damping starts **ramping up every frame**. The linear part starts at 0.001 and grows by 0.001/120 a frame, and the spin part does the same from 0.07. Pins can't wobble forever, which keeps turns short.
+- **End of turn:** the turn ends once the pins have settled or after a timeout (480 frames, 8 s; 900 frames overall).
+- **Randomness:** ball–pin hits multiply the impact by a random factor between **0.3 and 0.8**, so identical throws don't always give identical results.
+- **Instant replay:** the game stores **15 snapshots** of the ball, every pin and the throw state, which it uses for replays.
+
+### Physics settings
+
+A setup function fills a 720-byte struct with about 180 hardcoded values. These are not in the tuning file. Confirmed so far:
+
+| Value | Meaning |
+| --- | --- |
+| −192 | Pin-deck start (z) |
+| −193 / −197 / −200 | Pin deck back / pit edges |
+| 1.075 | Ball radius |
+| 0.002 | Ball drag while skidding |
+| 0.001 → +0.001/120 per frame | Pin linear-damping ramp after ~1 s |
+| 0.07 → +0.07/120 per frame | Pin spin-damping ramp after ~1 s |
+
+The struct also holds two tables of 8 values between 0.3 and 0.65. They're probably pin profile radii: a real pin's belly radius is ≈ 0.6 units and its neck ≈ 0.23. It also has a table of 10 small values (0.007–0.03), one per pin position. Neither is confirmed yet.
+
+### What this means for Open Sports
+
+- A small fixed-step rigid-body solver with drag, a sleep threshold and sub-steps is enough. We don't need a full physics engine, which keeps it identical across LÖVE and GMod.
+- Copy the **damping ramp** after impact, so turns end quickly even with 1,000 pins.
+- Pins as **stacked spheres** (8 per pin) keep pin-vs-pin collisions cheap.
+- Make the **random factor** a tuning value. Arcade keeps it, Realistic can set it to zero or a narrow range.
 
 ## What this means for Open Sports
 
