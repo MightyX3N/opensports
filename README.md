@@ -63,6 +63,17 @@ Every style follows the same rig contract: head, torso, hands, feet and an equip
 Sport animations move hand and foot targets, and each style reaches them in its own way (floating hands are placed directly, full arms use IK).
 That way any style works in any sport, and players with different styles can share a match.
 
+## Announcer
+
+Every announcer line is a named line ID with text, e.g. `bowling.strike = "Strike!"`. When a line plays, the game uses the first source available:
+
+1. A recorded line from an installed voice pack or add-on
+2. The original line, if the player converted it from their own disc
+3. Offline text-to-speech, generated from the text
+
+Add-ons can just write text for new lines and they'll be spoken automatically, or ship their own recordings.
+Speech is generated once and cached as audio, so it costs nothing at runtime. Only dynamic lines, such as player names, are generated on the fly.
+
 ## Original assets
 
 Open Sports ships only its own art and audio. An optional converter can turn files from a user's own Wii Sports or Wii Sports Resort disc into an asset pack on their machine.
