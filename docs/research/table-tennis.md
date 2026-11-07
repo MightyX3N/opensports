@@ -48,6 +48,31 @@ Each swing produces four measurements on the player's racket state. They're turn
 - **Assist:** under some conditions it blends power and sidespin halfway toward safer values. This is probably help for weaker players or slower returns. One check uses `0.866`, which is cos 30°.
 - A separate path, used by the CPU or a training mode, blends toward the opposite corner (−1 values).
 
+### Where the four measurements come from
+
+The racket's orientation is tracked every frame (an orientation matrix updated from the motion sensor). Each frame, one entry is written into a **100-frame history** with three values:
+
+1. **Twist:** how much the racket rolled since last frame.
+2. **Sweep:** how far the racket's pointing direction swung sideways, measured in the horizontal plane and signed by direction.
+3. **Strength:** the current swing strength, mapped to −1..1.
+
+At the moment of contact, the game **adds up the last 30 frames (half a second)** of twist and of sweep. Those totals are the two racket angles in the table above: twist with a ±10 dead zone, sweep with a ±30 dead zone. Sidespin and spin come from how the racket turned during the swing, not from where it ended up.
+
+### Swing detection
+
+- Each frame, the controller's rotation direction is compared with the forehand and backhand axes. Two separate strength values are kept, one for **forehand** and one for **backhand**.
+- Each is a **peak hold**: it jumps up to a new peak, holds it for **8 frames**, then decays by **0.995** per frame.
+- A swing fires when either strength passes its threshold. Forehand and backhand can hand over to each other mid-rally.
+- The racket's sideways reach is clamped to about **±130–145°**, with a gain of **1.3**.
+
+### Aim
+
+When the ball is hit, the shot direction is blended between a default direction and **the angle from the player to the ball**. The blend depends on how far away the ball is (ramping from 1.0 to 1.6 m). So **timing aims the shot**: meet the ball early or late and the angle changes, like real table tennis.
+
+### Smash height
+
+The smash chance ramps up as the ball's height goes from **8 to 9 units** (0.8 to 0.9 m) at contact.
+
 ## Ball flight
 
 Each frame, scaled by a time factor (a game-speed value times a per-shot value):
@@ -80,4 +105,4 @@ The table's top surface measures about ±7.6 × ±13.2 units, close to a real ta
 - **We shouldn't ship fixed tables.** Our engine can build them at load time with a small solver: simulate shots with our own physics and search for the speed and angles that hit each grid target. That's how the **folded-table practice mode** and modded tables of any size will work. A new table shape gets its own course table automatically.
 - **Arcade mode** uses the solved launch (always lands where you aimed, if you timed it). **Realistic mode** can skip the solver and launch straight from racket speed and angle, so misses are possible.
 
-Still to do: which MotionPlus readings feed the four racket measurements, how the aim target is chosen from swing timing, the serve table's axes, and the CPU data.
+Still to do: the serve table's axes, the CPU opponent data, and the exact swing thresholds.
