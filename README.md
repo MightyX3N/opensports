@@ -72,7 +72,8 @@ Every announcer line is a named line ID with text, e.g. `bowling.strike = "Strik
 3. Offline text-to-speech, generated from the text
 
 Add-ons can just write text for new lines and they'll be spoken automatically, or ship their own recordings.
-Speech is generated once and cached as audio, so it costs nothing at runtime. Only dynamic lines, such as player names, are generated on the fly.
+Speech is generated the first time a line is needed and cached as audio from then on, the same way on desktop, Android and Garry's Mod.
+When a sport loads, its lines are also generated in the background ahead of time, so time-critical lines like "Strike!" are usually ready before they're needed.
 
 ## Original assets
 
