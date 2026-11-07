@@ -75,6 +75,10 @@ Add-ons can just write text for new lines and they'll be spoken automatically, o
 Speech is generated the first time a line is needed and cached as audio from then on, the same way on desktop, Android and Garry's Mod.
 When a sport loads, its lines are also generated in the background ahead of time, so time-critical lines like "Strike!" are usually ready before they're needed.
 
+Every line carries a version number, e.g. `bowling.strike = { text = "Strike!", version = 2 }`.
+Each cached file records the line's version, plus the voice model and its settings. When any of them changes, that line is regenerated the next time it's needed and the old file is removed.
+Bumping the version also forces a fresh take when the text stays the same, for example after fixing a pronunciation.
+
 ## Original assets
 
 Open Sports ships only its own art and audio. An optional converter can turn files from a user's own Wii Sports or Wii Sports Resort disc into an asset pack on their machine.
