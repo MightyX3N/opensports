@@ -49,6 +49,19 @@ Every sport also gets a **Custom** mode with in-game sliders for its tuning tabl
 
 - **Sport add-ons** add new sports and run on all three platforms.
 - **Asset packs** replace models, textures and sounds by named slot (glTF, PNG, OGG).
+- **Avatar styles** add new character styles that every sport can use.
+
+## Avatars
+
+Each player picks an avatar style. Three ship with the game, and add-ons can add more:
+
+- **Bean** – big round head, bean body, floating hands
+- **Peg** – peg-doll capsule body, floating hands, no legs
+- **Sporty** – about 3.5 heads tall with full arms and legs
+
+Every style follows the same rig contract: head, torso, hands, feet and an equipment socket.
+Sport animations move hand and foot targets, and each style reaches them in its own way (floating hands are placed directly, full arms use IK).
+That way any style works in any sport, and players with different styles can share a match.
 
 ## Original assets
 
