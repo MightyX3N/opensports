@@ -15,7 +15,7 @@ Swing a real controller to bowl, serve, putt, slice and throw, alone or with fri
 love .
 ```
 
-Connect a gyro controller (Joy-Con, Pro Controller, DualSense, DualShock 4 or a Bluetooth pad) and it shows up next to the mouse. **Joy-Con 2 and Pro Controller 2:** run [joycon2cpp](https://github.com/TheFrano/joycon2cpp/releases) and set its Gyro Output to **DSU UDP**. The controller then appears in the game as **DSU pad 1**. Any DSU server works the same way: BetterJoy, DS4Windows, joycon2android (enter your PC's address), SteamDeckGyroDSU. The game's own **Connect Joy-Con 2** button is an experimental fallback. Use the D-pad, stick, arrow keys or mouse in the menus. **Tab** / button 2 switches controllers and **R** / button 1 recentres.
+Connect a gyro controller (Joy-Con, Pro Controller, DualSense, DualShock 4 or a Bluetooth pad) and it shows up next to the mouse. **Joy-Con 2 and Pro Controller 2** don't appear in Windows Bluetooth settings. Choose **Connect Joy-Con 2** in the game, press SYNC, and pick it from the list. The motion conversion is joycon2android's measured one. DSU servers (BetterJoy, DS4Windows, joycon2cpp, …) also show up automatically as **DSU pad**. Use the D-pad, stick, arrow keys or mouse in the menus. **Tab** / button 2 switches controllers and **R** / button 1 recentres.
 
 The app has four screens:
 - **Motion test:** the controller drawn in 3D, live gyro and accelerometer readings, and the last detected swing.

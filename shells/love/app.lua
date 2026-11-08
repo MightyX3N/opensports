@@ -356,8 +356,8 @@ function screens.pair.draw()
   for i = 0, 3 do lg.setColor(i == 1 and C.green or C.line); lg.circle("fill", 380 + i * 22, 360, 6) end
   lg.setColor(C.blue); lg.setLineWidth(3); lg.circle("line", 282, 360, 18); lg.setLineWidth(1)
   U.text("SYNC", 252, 392, 13, C.blueDark, "center", 60)
-  U.text("Recommended: run joycon2cpp (github.com/TheFrano/joycon2cpp) with Gyro Output set to DSU UDP. Its controllers appear here automatically as \"DSU pad\". The direct connection on the right is a fallback.",
-    110, 440, 14, C.sub, "left", 480)
+  U.text("Windows doesn't list Joy-Con 2 under Bluetooth settings — the game connects to them directly. Press SYNC every time you connect.",
+    110, 446, 14, C.sub, "left", 480)
 
   U.text("CONTROLLERS NEARBY", 652, 130, 16, C.sub)
   app.pairHits = {}

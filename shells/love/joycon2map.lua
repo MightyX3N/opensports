@@ -1,34 +1,27 @@
--- Joy-Con 2 / Pro Controller 2 sensor axes -> core.math convention
--- (x = right, y = up out of the button face, z = towards the player; held like a remote,
--- the shoulder-button end points along -z).
+-- Joy-Con 2 sensor axes -> the game's frame, using joycon2android's measured conversion
+-- (GPL-3.0, github.com/JoeGeC/joycon2android, docs/dsu-motion.md, verified there against
+-- Dolphin's pointer) followed by Dolphin's reading of the DSU/cemuhook frame (core/dsu.lua).
 --
--- Joy-Con 2 (R) is measured from a real recording (tests/data/jc2-right-ceiling-twist.txt):
--- raw X points along the shoulder end, raw Y to the left side, raw Z out of the buttons.
--- Joy-Con 2 (L) is assumed to be the same until we have a recording of one.
--- Pro Controller 2 / GameCube use SDL_hidapi_switch2.c's gamepad mapping (x, z, -y).
+-- joycon2android, Joy-Con 2 (R) raw: x = controller's right, y = toward the tail,
+-- z = out of the button face. Scales: 4096 LSB per g, 0.06103515625 °/s per LSB (±2000 °/s).
+-- Left Joy-Con and Pro Controller 2 are assumed to share the raw frame (as there).
+local dsu = require("core.dsu")
 local M = {}
-local G = 9.80665
 
-local function remote(v) return { -v[2], v[3], -v[1] } end
-local function gamepad(v) return { v[1], v[3], -v[2] } end
+local ACCEL_G_PER_LSB = 0.000244140625
+local GYRO_DPS_PER_LSB = 0.06103515625
 
-M.MAP = { [0x2066] = remote, [0x2067] = remote }
-
--- map a quaternion given in the device's native axes into the game's axes (similarity
--- transform by the same axis permutation: w stays, the vector part is permuted)
-function M.quat(pid, q)
-  local f = M.MAP[pid] or gamepad
-  local v = f({ q[2], q[3], q[4] })
-  return { q[1], v[1], v[2], v[3] }
+-- joycon2android MotionConverter.convert: raw -> cemuhook wire (accel g, gyro °/s)
+function M.toWire(rawG, rawA)
+  return {
+    accel = { -rawA[1] * ACCEL_G_PER_LSB, -rawA[3] * ACCEL_G_PER_LSB, rawA[2] * ACCEL_G_PER_LSB },
+    gyro = { rawG[1] * GYRO_DPS_PER_LSB, -rawG[3] * GYRO_DPS_PER_LSB, rawG[2] * GYRO_DPS_PER_LSB }, -- pitch, yaw, roll
+  }
 end
-function M.vec(pid, v) return (M.MAP[pid] or gamepad)(v) end
 
--- raw int16 gyro/accel -> rad/s, m/s² in the game's frame. gyroFull = full-scale rad/s.
-function M.convert(pid, rawG, rawA, gyroFull)
-  local f = M.MAP[pid] or gamepad
-  local gs, as = (gyroFull or 34.8) / 32767, G * 8 / 32767
-  local g, a = f(rawG), f(rawA)
-  return { g[1] * gs, g[2] * gs, g[3] * gs }, { a[1] * as, a[2] * as, a[3] * as }
+-- raw int16 gyro/accel -> rad/s, m/s² in the game's frame
+function M.convert(pid, rawG, rawA)
+  return dsu.toGame(M.toWire(rawG, rawA))
 end
 
 return M

@@ -152,7 +152,7 @@ function B.read(c, frameDt)
         nv.prevTime12 = d.time12
       end
       if d and d.q then
-        local q = jmap.quat(c.ble.pid, d.q)
+        local q = d.q -- native orientation path is disabled (side reports aren't subscribed)
         local l = math.sqrt(q[1] ^ 2 + q[2] ^ 2 + q[3] ^ 2 + q[4] ^ 2)
         if l > 0.9 and l < 1.1 then
           -- keep sign continuity (q and -q are the same orientation)
@@ -211,7 +211,7 @@ function B.read(c, frameDt)
     c.bleTs = ts
     dt = dt or frameDt / n
     local g, a = jmap.convert(c.ble.pid, { s16(p, 0x36), s16(p, 0x38), s16(p, 0x3A) },
-      { s16(p, 0x30), s16(p, 0x32), s16(p, 0x34) }, c.gyroFull)
+      { s16(p, 0x30), s16(p, 0x32), s16(p, 0x34) })
     if B.log and B.log.ctrl == c then
       local hex = {}
       for k = 0, 0x3D do hex[#hex + 1] = string.format("%02x", p[k]) end

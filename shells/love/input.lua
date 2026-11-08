@@ -91,12 +91,12 @@ local function bleConnected(entry)
     profile = I.loadProfile(guid) }))
   c.ble = entry
   -- profiles saved before the axis-frame fix would double-rotate: reset their axes once
-  if c.profile.jc2frame ~= 3 then
+  if c.profile.jc2frame ~= 4 then
     local d = motion.defaultProfile()
     c.profile.gyroAxes, c.profile.gyroSign = d.gyroAxes, d.gyroSign
     c.profile.accelAxes, c.profile.accelSign = d.accelAxes, d.accelSign
     c.profile.gyroScale, c.profile.accelScale = 1, 1
-    c.profile.jc2frame = 3
+    c.profile.jc2frame = 4
     I.saveProfile(c)
   end
   c:recentre()

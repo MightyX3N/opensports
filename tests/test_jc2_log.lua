@@ -1,7 +1,7 @@
--- Replays a real Joy-Con 2 (R) recording through the same decode + fusion the game uses.
--- Recording: held like a TV remote (shoulder end to the TV, buttons up), then
--- ~4 s: tip raised to the ceiling and held, ~6 s: back, ~7 s: twisted clockwise a
--- quarter turn (buttons facing the right wall) and held to the end.
+-- Replays a real Joy-Con 2 (R) recording through the same decode + fusion the game uses,
+-- with joycon2android's measured axis frame. Read that way the recording is: level at rest,
+-- ~4 s rolled a quarter turn to the left and held, ~6.5 s back, ~7 s nose raised to the
+-- ceiling and held to the end.
 local m = require("core.math")
 local motion = require("core.motion")
 local jc2map = require("shells.love.joycon2map")
@@ -26,7 +26,7 @@ for _, smp in ipairs(samples) do
   local h = smp.hex
   local raw = { s16(h, 0x36), s16(h, 0x38), s16(h, 0x3A) }
   local rawA = { s16(h, 0x30), s16(h, 0x32), s16(h, 0x34) }
-  local g, a = jc2map.convert(0x2066, raw, rawA, 34.8)
+  local g, a = jc2map.convert(0x2066, raw, rawA)
   local ts = u32(h, 0x2A)
   local dt = prevTs and (ts - prevTs) / 1e6 or 0.03
   prevTs = ts
@@ -40,13 +40,13 @@ local function anglesAt(t)
   return math.deg(y), math.deg(p), math.deg(r)
 end
 local _, p0, r0 = anglesAt(1.0)
-ok(math.abs(p0) < 20 and math.abs(r0) < 25, string.format("start roughly level (pitch %.0f roll %.0f)", p0, r0))
-local _, p1 = anglesAt(4.9)
-ok(p1 > 65, string.format("tip to the ceiling reads as pitch up (got %.0f°)", p1))
-local _, p2 = anglesAt(6.9)
-ok(math.abs(p2) < 25, string.format("back to level (pitch %.0f°)", p2))
-local _, _, r3 = anglesAt(9.5)
-ok(r3 > 55, string.format("clockwise twist reads as roll right (got %.0f°)", r3))
+ok(math.abs(p0) < 20 and math.abs(r0) < 20, string.format("start roughly level (pitch %.0f roll %.0f)", p0, r0))
+local _, p1, r1 = anglesAt(5.0)
+ok(r1 < -65 and math.abs(p1) < 25, string.format("quarter roll left (roll %.0f°, pitch %.0f°)", r1, p1))
+local _, p2, r2 = anglesAt(7.0)
+ok(math.abs(r2) < 20 and math.abs(p2) < 25, string.format("back to level (roll %.0f°, pitch %.0f°)", r2, p2))
+local _, p3 = anglesAt(9.5)
+ok(p3 > 75, string.format("nose to the ceiling (pitch %.0f°)", p3))
 
 print(string.format("%d passed, %d failed", passes, fails))
 if fails > 0 then error("tests failed") end
