@@ -11,4 +11,6 @@
 - [linux-switch2](https://github.com/novakpetya/linux-switch2) PROTOCOL.md: the report layout, IMU scales and button bits
 - [bit-axis-labs](https://bit-axis-labs.pages.dev/blog/switch-2-ble-controllers.html): the protocol overview
 
+`core/dsu.lua` speaks the DSU (cemuhook) motion protocol. Its packet layout and axis meanings follow Dolphin's DualShockUDPClient (GPL-2.0-or-later).
+
 Online hosting uses the official playit.gg app, downloaded from playit's own releases on the player's machine when they choose to host. No playit code is included in this repository.

@@ -320,8 +320,9 @@ function screens.remap.draw()
       U.rect(470, y + 12, 150, 32, 16, C.warnSoft)
       U.text("Press a button…", 470, y + 18, 15, C.warn, "center", 150)
     else
-      local b = c.profile.buttons[act] or (c.ble and (I.jc2.DEFAULTS[c.ble.pid] or {})[act]) or I.DEFAULT_BUTTONS[act]
-      b = b:gsub("^jc:", "")
+      local b = c.profile.buttons[act] or (c.ble and (I.jc2.DEFAULTS[c.ble.pid] or {})[act])
+        or (c.dsu and I.dsu.DEFAULT_BUTTONS[act]) or I.DEFAULT_BUTTONS[act]
+      b = b:gsub("^jc:", ""):gsub("^dsu:", "")
       local bw = math.max(38, U.textWidth(b:upper(), 16) + 20)
       lg.setColor(C.ink); lg.rectangle("fill", 622 - bw, y + 9, bw, 38, 19, 19)
       U.text(b:upper(), 622 - bw, y + 19, 16, C.card, "center", bw)
@@ -332,7 +333,7 @@ function screens.remap.draw()
   U.rect(680, 130, 520, 420, 32, C.card)
   U.text(app.listening and ("Press the button you want for " .. app.listening:upper())
     or "Pick an action, then press its new button", 712, 162, 24, C.ink, "center", 456)
-  U.text((c.joystick or c.ble) and "Saved for this exact controller" or "This device has no buttons to remap", 712, 500, 14, C.sub, "center", 456)
+  U.text((c.joystick or c.ble or c.dsu) and "Saved for this exact controller" or "This device has no buttons to remap", 712, 500, 14, C.sub, "center", 456)
   footer({ { "Reset to default", "reset" }, { "Save for this controller", "save", "primary" } })
 end
 
@@ -355,8 +356,8 @@ function screens.pair.draw()
   for i = 0, 3 do lg.setColor(i == 1 and C.green or C.line); lg.circle("fill", 380 + i * 22, 360, 6) end
   lg.setColor(C.blue); lg.setLineWidth(3); lg.circle("line", 282, 360, 18); lg.setLineWidth(1)
   U.text("SYNC", 252, 392, 13, C.blueDark, "center", 60)
-  U.text("Windows doesn't list Joy-Con 2 under Bluetooth settings — the game connects to them directly. Press SYNC every time you connect.",
-    110, 446, 14, C.sub, "left", 480)
+  U.text("Recommended: run joycon2cpp (github.com/TheFrano/joycon2cpp) with Gyro Output set to DSU UDP. Its controllers appear here automatically as \"DSU pad\". The direct connection on the right is a fallback.",
+    110, 440, 14, C.sub, "left", 480)
 
   U.text("CONTROLLERS NEARBY", 652, 130, 16, C.sub)
   app.pairHits = {}
@@ -442,7 +443,7 @@ local function navigate(nav)
       if nav.down then
         if app.remapSel == #I.ACTIONS then app.focus = app.footerCount else app.remapSel = app.remapSel + 1 end
       end
-      if nav.a and (ctrl().joystick or ctrl().ble) then
+      if nav.a and (ctrl().joystick or ctrl().ble or ctrl().dsu) then
         local act = I.ACTIONS[app.remapSel]
         app.listening = act
         I.capture(function(c, button)
