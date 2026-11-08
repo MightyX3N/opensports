@@ -222,6 +222,22 @@ As specified in the README. Implementation notes:
   - Clients read motion locally and send **swing events** (the result of swing detection: release time, velocity, spin, aim), not raw samples. That keeps bandwidth tiny and makes cheating no easier than with mouse input.
   - The server broadcasts compact snapshots at 20–30 Hz. Clients interpolate, and predict their own throw with the deterministic physics so it feels instant.
 
+## 9b. Screens and Android devices
+
+- **Main Android targets:** Android TV / TV boxes and tablets. Phones are supported but not designed around.
+- **Orientation:** landscape only on every Android device (`sensorLandscape`).
+- **Menu UI:**
+  - It is laid out in a fixed 16:9 design space and scaled uniformly to the screen, with safe-area padding for TV overscan and phone notches.
+  - Text and hit targets have a minimum size in real pixels, so small phones stay usable and 4K TVs stay sharp (the UI art is vector or high-resolution).
+- **Navigation:**
+  - Every menu works with three inputs: pointer (Wii IR, gyro-aim, mouse, touch), D-pad/stick focus navigation, and TV-remote keys (D-pad, OK, Back).
+  - Focus order is defined per screen, so a TV remote alone can reach everything outside of gameplay.
+- **Android TV:** a leanback launcher banner and `android.software.leanback` (not required) in the manifest, gamepad declared as supported, and touch marked not required.
+- **Controllers on Android:**
+  - Bluetooth gamepads with gyro and Joy-Con through SDL.
+  - The DolphinBar through USB OTG on boxes and tablets that support it.
+  - Phone or tablet gyro as a fallback controller.
+
 ## 10. Saves and settings
 
 - `<save>/settings.lua`: controllers, calibration, profile defaults, audio.
