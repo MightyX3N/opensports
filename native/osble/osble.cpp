@@ -208,7 +208,8 @@ static void connectThread(std::shared_ptr<Pad> p) {
       ch.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue::Notify).get();
     };
     hook(p->input, 0);
-    if (p->side) { try { hook(p->side, 1); } catch (...) {} }
+    // NOTE: subscribing to the native side report as well stops the common report on real
+    // hardware (no gyro at all), so it stays off. Same characteristics as joycon2cpp.
     if (p->reply) {
       try { p->reply.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue::Notify).get(); } catch (...) {}
     }
