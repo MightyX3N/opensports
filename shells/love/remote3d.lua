@@ -30,7 +30,9 @@ local decals = {
 
 local LIGHT = m.norm({ -0.4, 0.8, 0.5 })
 -- camera sits behind and a little above/right of the player's hand
-local VIEW = m.qmul(m.qaxis({ 1, 0, 0 }, math.rad(28)), m.qaxis({ 0, 1, 0 }, math.rad(-32)))
+-- camera straight behind the player's hand, looking slightly down: pointing at the TV shows
+-- the remote straight ahead (no sideways camera angle that makes "forward" look turned)
+local VIEW = m.qaxis({ 1, 0, 0 }, math.rad(18))
 
 local function project(p, cx, cy, f)
   local d = CAM - p[3]

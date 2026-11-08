@@ -113,18 +113,14 @@ function M:feed(dt, gyroRaw, accelRaw)
 
   -- gyro pointer: moved by player-space gyro (yaw around gravity, pitch), like a mouse.
   -- It never "loses" its place when orientation drifts, and pins at the screen edges.
-  if not self.hasPointer and self.extOrient then
-    -- absolute pointing (like the Wii's IR): angle from the recentred heading
+  -- pointer comes from the same orientation the 3D model shows (absolute, like the Wii's
+  -- IR), so the dot and the model always agree; recentre sets "straight at the screen"
+  if not self.hasPointer then
     local yaw, pitch = m.angles(self.orient)
-    self.pointer.x = m.clamp(0.5 - yaw / (2 * self.pointerFov[1]), 0, 1)
-    self.pointer.y = m.clamp(0.5 - pitch / (2 * self.pointerFov[2]), 0, 1)
-    self.pointer.valid = true
-  elseif not self.hasPointer then
-    local pitchRate, yawRate = f:playerSpace()
-    local px = self.pointer.x - (yawRate * dt) / (2 * self.pointerFov[1] * DEG)
-    local py = self.pointer.y - (pitchRate * dt) / (2 * self.pointerFov[2] * DEG)
+    local px = 0.5 - yaw / (2 * self.pointerFov[1])
+    local py = 0.5 - pitch / (2 * self.pointerFov[2])
+    self.pointer.valid = math.abs(yaw) < math.rad(80) and math.abs(pitch) < math.rad(70)
     self.pointer.x, self.pointer.y = m.clamp(px, 0, 1), m.clamp(py, 0, 1)
-    self.pointer.valid = true
   end
 
   local h = self.history
