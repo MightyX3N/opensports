@@ -186,16 +186,12 @@ As specified in the README. Implementation notes:
   - **playit.gg, current plan (terms checked 2026-11-08):**
     - playit's Terms §3.4 say the service may not be redistributed, and may not be offered "as part of a hosted, managed, bundled, white-labeled, or multi-tenant service", without prior written consent from Developed Methods LLC.
     - The agent's *code* is BSD-2-Clause, but that licence covers the code, not use of their network. **Bundling the agent therefore needs their written permission first.**
-    - **Without permission (ships first):** a guided "Host online" screen.
+    - **What we ship:** a guided "Host online" screen.
       1. A link to the official playit download.
       2. Steps to create a UDP tunnel to the game's port, with the port shown and a copy button.
       3. A field to paste the resulting `*.ply.gg` address, which the game remembers and shows as a join code.
       - The player uses playit's own app under their own account, which is ordinary use.
-    - **With written permission:** the `os-tunnel` helper as designed:
-      - It is built on `agent_core` and `api_client` (rustls + ring, so it cross-compiles to Windows, Linux and Android, packaged as `libostunnel.so` in the APK).
-      - It runs the claim flow (`https://playit.gg/claim/<code>` → secret saved in `<save>/net/playit.secret`), keeps one reused UDP tunnel named `opensports` → `127.0.0.1:<port>`, and reports the address over stdout as JSON.
-      - The licence text goes in `THIRD_PARTY.md` and the credits screen.
-      - The permission request should state: free GPL game, each player uses their own playit account, one UDP tunnel per host, no resale, normal agent traffic only.
+    - **Bundling is not being pursued**, so the guided screen above is the final design. The game never ships or runs playit's code; it only links to it.
     - **Fallbacks always available:** direct IP, LAN discovery, paste-any-address.
 - **GMod:**
   - The server runs the core simulation and is authoritative.
