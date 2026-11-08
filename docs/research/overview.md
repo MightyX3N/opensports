@@ -100,8 +100,7 @@ These ranges map the remote's tilt and speed onto the plane's pitch, roll and th
 
 ## Still open
 
-- Golf: how club speed at impact sets launch speed, angle and spin (see `golf.md`).
 - Baseball: the per-pitch curve force vectors (built at run time) and the 1/2-button flag (see `baseball.md`).
 - Air sports: which range in the plane table drives which control.
 
-Tennis is done (see `tennis.md`).
+Tennis and golf are done (see `tennis.md`, `golf.md`).

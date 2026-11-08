@@ -32,9 +32,42 @@ Each frame:
 ## Course data
 `fn_802D6030` writes a table of hole positions (tee and pin points, e.g. `(93, 140.3, −1522.8)`). The course converter can read these from the user's own disc at run time.
 
+## Shot launch (solved)
+
+**Club set-up.** Four club objects are built in `fn_802E2150`: wood, iron, sand wedge and putter.
+- Each has its own vtable.
+- Slot `+0x0C` launches the ball, slot `+0x10` sets side spin and slot `+0x14` measures the swing error.
+
+**Launch** (`fn_802DF824`):
+1. `p = curve(k, min(power, 1))`, where power is the meter reading and `curve` is `fn_802DB8A4`, the soft power curve.
+2. Direction = the aim direction, tilted up by the club's loft.
+3. Speed = `min + p × (max − min)`.
+4. Ball spin A (lift; decays ×0.9985 per frame) = `lift × p`.
+5. Ball spin B (side) starts at 0.
+
+| Club | Curve k | Min speed | Max speed | Loft | Lift spin factor | Side spin factor |
+|---|---|---|---|---|---|---|
+| Wood | 0.70 | 0.02 | 3.32 | 11° | 0.7 | 0.5 |
+| Iron | 0.656 | 0.02 | 2.30 | 25° | 0.5 | 0.6 |
+| Sand wedge | 0.64 | 0.01 | 1.28 | 43° | 0 | 0.6 |
+| Putter | 0.63 | 0.004 | 0.41 | 0° | 0 | 0 |
+
+Speeds are in units per frame. The golf course is not at real scale, so these numbers only make sense against the game's own courses.
+
+**Hook and slice** (`fn_802EAC94`, `fn_802EDD98`, `fn_802D1880`):
+- The meter can go up to 1.25, so you can overswing past 100 %.
+- When the swing doesn't match the meter, the error `d` is mapped to a curve strength:
+  - `d < 0.25`: 0.2 rising to 1.0
+  - `d ≥ 0.25`: 1.0 rising to a cap of 2.6
+- After launch, side spin = the club's side spin factor × that strength.
+- The direction (hook or slice) comes from whether a swing frame counter is odd or even at that moment. In practice that is a coin flip, not something the player controls.
+- Another branch (`fn_802DFA98`) handles putting and an accuracy mode: the miss is eased with distance bands of 5–150 and 20–75.
+
 ## Still open
-- The exact link from club speed at impact to launch speed, launch angle and starting spin. This is the remaining piece for golf.
+- Nothing major is left for golf. `fn_802DFA10`, which gives the actual swing value compared against the meter, is a jump-table function that the decompiler couldn't handle. Its exact formula would need an asm read.
 
 ## For Open Sports
+- The club table above is plain data, so add-ons can add clubs (a driver, a 5-iron, a lob wedge).
+- Our Arcade mode can keep the random hook/slice; Realistic mode should base it on the remote's twist at impact.
 - Spin decay rates, wind strength and the friction curve are tuning values.
 - Surface types become materials in the course file, so add-on courses can define their own.
