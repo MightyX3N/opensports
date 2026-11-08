@@ -212,6 +212,7 @@ function B.logTick()
     love.filesystem.write(name, table.concat(L.lines, "\n"))
     B.lastLog = love.filesystem.getSaveDirectory() .. "/" .. name
     B.log = nil
+    pcall(love.system.openURL, "file:///" .. love.filesystem.getSaveDirectory():gsub("\\", "/"))
   end
   return left
 end
