@@ -61,10 +61,37 @@ Depth varies by sport:
 5. **Pre-simulated paths** (archery, aim guides) are cheap and give Arcade previews.
 6. **CPU players** are data-driven per sport, like Nintendo's CPU tables.
 
+## Follow-up findings
+
+### Tennis
+- **Prediction drives movement.** The game reruns the same ball step many frames ahead, in loops, to predict where the ball will be. Players and the CPU run to the predicted interception point, which is how auto-movement works.
+- **Hit window:** a swing only connects if the ball is between **0.5 and 2.5 m** from the player and inside a **120° cone** in front of them, with a small 4° tolerance.
+- **Training ball machine:** it launches with random sideways angles of ±12°, random spin on some shots, and speed scaled by the drill level (up to about 1.7× plus a base).
+- Not found yet: the launch for a normal player shot. It isn't set through the same function as the training launcher.
+
+### Baseball
+- The big tables of cosine values are **camera rotation matrices and positions** (broadcast-style views), not pitch data.
+- A generic body step with damping **×0.9985** per axis, spin damping ×0.9985 and gravity **−0.005 per frame** is the most likely candidate for the hit-ball step.
+- Not traced yet: pitch types and how bat timing becomes the hit direction.
+
+### Golf
+- Confirmed: **ground roll** (damping ×0.9985 / ×0.997, slope force from the surface normal, stop threshold). Several nearby functions use one smooth "ease" curve to blend values like damping 0.95→0.99 from speed.
+- Not traced yet: swing to power, hook and slice, and flight in the air.
+
+### Swordplay
+- Speed Slice objects are **really cut along the sword's plane**. The 24 `Proj/*.dat` files are **projected textures for the cut faces**: each holds a 128×256 interior texture area, UV rectangle, scale and rotation. A sliced melon shows its flesh and a cake its sponge, wherever the cut lands.
+- The cut direction an object asks for (the arrow shown before it falls) is compared with the sword's swing direction.
+
+### Cycling
+- **Rider lean comes from tilting the controllers.** Lean is smoothed (×0.93 per frame) and clamped to ±60°, head turn to ±15°, and body pitch to −60°…+20°. Speed feeds a cadence value through a 0.05 smoother.
+
+### Canoe and air sports
+- Canoe: see `BoatParam.dat` above. Paddle force and stroke timing per boat size; strokes push the boat and damping slows it.
+- Air sports: plane flight has its own damping set and a camera path table. The controller tilt mapping wasn't traced.
+
 ## Still open
 
-- Tennis shot targeting (whether it uses a course table like table tennis).
-- The baseball pitch and hit model in detail.
-- Golf swing → power / hook / slice, and the ball's flight in the air.
-- How the swordplay sword is checked against cut objects.
-- How cycling, canoe and air sports controls map to motion.
+- Tennis player shot launch.
+- Baseball pitch types and hit direction.
+- Golf swing to power, hook and slice, and flight in the air.
+- Air sports tilt mapping.
