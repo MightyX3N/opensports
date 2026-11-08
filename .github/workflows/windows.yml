@@ -27,6 +27,14 @@ jobs:
       with:
         path: game
 
+    - name: Run core tests (LuaJIT)
+      shell: pwsh
+      run: |
+        python -m pip install --quiet lupa
+        cd game
+        python tools/runlua.py tests/test_core.lua
+        python tools/runlua.py tests/test_jc2_log.lua
+
     - name: Cache LÖVE build
       id: cache
       uses: actions/cache@v4

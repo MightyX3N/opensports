@@ -3,6 +3,7 @@
 -- Report layout (common report 0x05, 63 bytes): linux-switch2 PROTOCOL.md §29–37.
 local ok, ffi = pcall(require, "ffi")
 local motion = require("core.motion")
+local jmap = require("shells.love.joycon2map")
 local B = { available = false, found = {}, status = nil, pads = {} }
 
 local G = 9.80665
@@ -167,14 +168,13 @@ function B.read(c, frameDt)
     end
     c.bleTs = ts
     dt = dt or frameDt / n
-    local gs = (c.gyroFull or 34.8) / 32767
-    local g = { s16(p, 0x36) * gs, s16(p, 0x3A) * gs, -s16(p, 0x38) * gs }
+    local g, a = jmap.convert(c.ble.pid, { s16(p, 0x36), s16(p, 0x38), s16(p, 0x3A) },
+      { s16(p, 0x30), s16(p, 0x32), s16(p, 0x34) }, c.gyroFull)
     if B.log and B.log.ctrl == c then
       local hex = {}
       for k = 0, 0x3D do hex[#hex + 1] = string.format("%02x", p[k]) end
       B.log.lines[#B.log.lines + 1] = string.format("%.4f %.5f %s", love.timer.getTime() - B.log.t0, dt, table.concat(hex))
     end
-    local a = { s16(p, 0x30) * B.ACCEL_SCALE, s16(p, 0x34) * B.ACCEL_SCALE, -s16(p, 0x32) * B.ACCEL_SCALE }
     c.lastRaw = { g = g, a = a }
     c:feed(dt, g, a)
     if i == n - 1 then

@@ -212,6 +212,13 @@ static void connectThread(std::shared_ptr<Pad> p) {
 
     push(EV_STATUS, p->id, p->addr, p->pid, 0, "Starting controller");
     runInit(*p);
+    // ask again after init: linux-switch2 found a fixed 7.5 ms interval is what keeps
+    // motion reports flowing; Windows only lets us ask for its throughput profile
+    try {
+      auto session = GattSession::FromDeviceIdAsync(p->device.BluetoothDeviceId()).get();
+      if (session) session.MaintainConnection(true);
+      p->device.RequestPreferredConnectionParameters(BluetoothLEPreferredConnectionParameters::ThroughputOptimized());
+    } catch (...) {}
     p->alive = true;
     push(EV_CONNECTED, p->id, p->addr, p->pid, 0, "Connected");
   } catch (hresult_error const& e) {
