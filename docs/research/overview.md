@@ -89,9 +89,19 @@ Depth varies by sport:
 - Canoe: see `BoatParam.dat` above. Paddle force and stroke timing per boat size; strokes push the boat and damping slows it.
 - Air sports: plane flight has its own damping set and a camera path table. The controller tilt mapping wasn't traced.
 
+## Air sports (Resort)
+
+The plane's tuning is one static table at `0x807D9640`, filled by `fn_80432AE0`. Each entry is a range: low, high, span and 1/span. Examples:
+- 30° → 120° (span 90)
+- 0.6 → 0.9
+- 0.01 → 0.05
+
+These ranges map the remote's tilt and speed onto the plane's pitch, roll and throttle. The code that reads each range isn't traced yet, so the labels are still unknown.
+
 ## Still open
 
-- Tennis player shot launch.
-- Baseball pitch types and hit direction.
-- Golf swing to power, hook and slice, and flight in the air.
-- Air sports tilt mapping.
+- Golf: how club speed at impact sets launch speed, angle and spin (see `golf.md`).
+- Baseball: the per-pitch curve force vectors (built at run time) and the 1/2-button flag (see `baseball.md`).
+- Air sports: which range in the plane table drives which control.
+
+Tennis is done (see `tennis.md`).
