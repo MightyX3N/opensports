@@ -84,6 +84,17 @@ MotionController = {
 
 **Decide (GMod motion):** a client binary module (`gmcl_opensports`) gives full motion; Steam Input gyro-as-mouse is the no-install fallback with mouse gestures. A separate OmniPlay-style hub app sending UDP to localhost is **not** possible on servers without `-allowlocalhttp`, so the module is the main path.
 
+## 3b. Menu UI scaling
+
+The menus (see the design canvas) are big rounded tiles, pills and banners on a plain background. That style scales cleanly, so one layout serves a phone, a TV and a GMod HUD:
+
+- **Reference canvas:** layouts are authored at 1280×720 logical units. The shell scales them uniformly by `min(w/1280, h/720)` and centres the result, so nothing stretches.
+- **Edge-anchored bars:** the title bar, the bottom button bar and the player cards anchor to screen edges and stretch along them. Only their contents scale, so wide and tall screens fill out instead of letterboxing.
+- **Reflowing grids:** the sports grid picks its column count from the available width (4 on 16:9, 3 on 4:3 or tablets, 2 in phone portrait). Tiles keep their shape.
+- **Minimum sizes:** text and touch targets never drop below a physical minimum (about 9 mm or 48 dp tap targets on Android, 14 px text on desktop). On small screens the layout scrolls rather than shrinking below that.
+- **Safe areas:** phone notches and cut-outs, plus TV overscan (an optional 5 % margin in settings).
+- **Same layout tables everywhere:** `drawUI(layout)` in the shell interface takes the same layout tables on LÖVE and GMod (`ScrW()`/`ScrH()`). Pointer input (IR, gyro aim, mouse, touch) is mapped into the same logical units.
+
 ## 4. Fixed step and physics
 
 - **Simulation:** fixed 120 Hz step, with render interpolation. The originals ran at 60 Hz; all the research constants are converted to per-second SI units on load (`perFrame × 60`, `perFrame² × 3600`).
