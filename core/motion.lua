@@ -1,10 +1,12 @@
 -- MotionController: every input device ends up as one of these.
 -- Sports read only these fields; backends only call :feed() and set buttons.
 local m = require("core.math")
+local gmh = require("core.gmh")
 local M = {}
 M.__index = M
 
 local G = 9.80665
+local DEG = 180 / math.pi
 
 -- Fallback levels (architecture §3)
 M.FULL, M.GYRO_POINTER, M.STICK_POINTER, M.GESTURE = 1, 2, 3, 4
@@ -50,8 +52,7 @@ function M.new(opts)
   c.t = 0
   c.rate = 0             -- measured samples per second
   c.rateAcc, c.rateN = 0, 0
-  c.kp, c.ki = 1.5, 0.01 -- Mahony gains
-  c.eInt = { 0, 0, 0 }
+  c.fusion = gmh.new()
   c.pointerFov = { math.rad(22), math.rad(13) } -- gyro-aimed pointer: half-angles that reach the screen edges
   return c
 end
@@ -73,64 +74,39 @@ function M:feed(dt, gyroRaw, accelRaw)
   local g = gyroRaw and remap(gyroRaw, p.gyroAxes, p.gyroSign, p.gyroScale) or { 0, 0, 0 }
   local a = accelRaw and remap(accelRaw, p.accelAxes, p.accelSign, p.accelScale) or nil
 
-  if self.biasSamples then -- resting calibration in progress
-    local b = self.biasSamples
-    b.n = b.n + 1
-    b.s = m.add(b.s, g)
-    if b.n >= b.need then
-      self.bias = m.scale(b.s, 1 / b.n)
+  if self.biasSamples then -- manual resting calibration ("put it down flat")
+    local bs = self.biasSamples
+    bs.n = bs.n + 1
+    bs.s = m.add(bs.s, g)
+    if bs.n >= bs.need then
+      self.fusion.bias = m.scale(bs.s, DEG / bs.n)
+      self.fusion.confidence = 1
       self.biasSamples = nil
     end
   end
-  -- auto bias: while the controller lies truly still, learn the gyro's zero offset.
-  -- "Truly still" = the reading barely varies (sensor noise only) and gravity is steady.
-  -- A hand always trembles, so even a slow aiming turn is never learned as bias.
-  if not self.biasSamples and a then
-    local k = math.min(1, dt * 2)          -- ~0.5 s running mean / variance
-    self.gMean = self.gMean and m.add(self.gMean, m.scale(m.sub(g, self.gMean), k)) or { g[1], g[2], g[3] }
-    local d = m.sub(g, self.gMean)
-    self.gVar = (self.gVar or 1e-3) + (m.dot(d, d) - (self.gVar or 1e-3)) * k
-    local steady = self.lastA and m.len(m.sub(a, self.lastA)) < 0.08
-    if math.sqrt(self.gVar) < 0.006 and math.abs(m.len(a) - G) < 0.4 and steady and m.len(self.gMean) < 0.2 then
-      self.stillT = (self.stillT or 0) + dt
-      if self.stillT > 1.0 then
-        self.bias = m.add(self.bias, m.scale(m.sub(self.gMean, self.bias), math.min(1, dt * 3)))
-      end
-    else
-      self.stillT = 0
-    end
-    self.lastA = a
-  end
-  g = m.sub(g, self.bias)
-  self.gyro = g
 
-  -- Mahony: pull the estimated "up" towards the measured gravity reaction.
-  if a then
-    self.accel = a
-    local al = m.len(a)
-    if al > 0.5 * G and al < 1.5 * G then -- only trust accel when not swinging hard
-      local an = m.scale(a, 1 / al)
-      local up = m.qrot(m.qconj(self.raw), m.UP) -- world up in controller space
-      local e = m.cross(an, up)
-      self.eInt = m.add(self.eInt, m.scale(e, self.ki * dt))
-      g = m.add(g, m.add(m.scale(e, self.kp), self.eInt))
-    end
-  end
-  self.raw = m.qintegrate(self.raw, g, dt)
+  -- Sensor fusion and automatic gyro calibration: GamepadMotionHelpers (core/gmh.lua).
+  local f = self.fusion
+  if a then self.accel = a end
+  local acc = a or m.qrot(m.qconj(f.q), { 0, G, 0 })
+  f:process(m.scale(g, DEG), m.scale(acc, 1 / G), dt)
+  self.bias = m.scale(f.bias, 1 / DEG)
+  self.gyro = m.scale(f.gyro, 1 / DEG)
+  self.raw = f.q
   self.orient = m.qmul(m.qaxis(m.UP, -self.yawOffset), self.raw)
-
   if a then
-    local wa = m.qrot(self.raw, a)
-    self.lin = { wa[1], wa[2] - G, wa[3] }
+    local wa = m.qrot(self.raw, m.scale(f.accel, G)) -- gravity already removed
+    self.lin = wa
   end
 
-  if not self.hasPointer then -- gyro-aimed pointer
-    local yaw, pitch = m.angles(self.orient)
-    local px = 0.5 - yaw / (2 * self.pointerFov[1])
-    local py = 0.5 - pitch / (2 * self.pointerFov[2])
-    -- pin to the screen edge instead of vanishing; "valid" only when really pointing at it
-    self.pointer.valid = px >= -0.25 and px <= 1.25 and py >= -0.25 and py <= 1.25
+  -- gyro pointer: moved by player-space gyro (yaw around gravity, pitch), like a mouse.
+  -- It never "loses" its place when orientation drifts, and pins at the screen edges.
+  if not self.hasPointer then
+    local pitchRate, yawRate = f:playerSpace()
+    local px = self.pointer.x - (yawRate * dt) / (2 * self.pointerFov[1] * DEG)
+    local py = self.pointer.y - (pitchRate * dt) / (2 * self.pointerFov[2] * DEG)
     self.pointer.x, self.pointer.y = m.clamp(px, 0, 1), m.clamp(py, 0, 1)
+    self.pointer.valid = true
   end
 
   local h = self.history
@@ -152,11 +128,11 @@ function M:recentre()
   local yaw = m.angles(self.raw)
   self.yawOffset = yaw
   self.orient = m.qmul(m.qaxis(m.UP, -yaw), self.raw)
+  self.pointer.x, self.pointer.y = 0.5, 0.5
 end
 
 function M:startRestCalibration(samples)
   self.biasSamples = { n = 0, need = samples or 200, s = { 0, 0, 0 } }
-  self.bias = { 0, 0, 0 }
 end
 function M:calibrating() return self.biasSamples ~= nil end
 

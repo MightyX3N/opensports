@@ -2,10 +2,12 @@
 
 | What | Where | Licence |
 |---|---|---|
+| GamepadMotionHelpers by Julian "Jibb" Smart: sensor fusion, automatic gyro calibration, player-space gyro (ported to Lua) | `core/gmh.lua` | MIT, Copyright (c) 2020-2023 Julian "Jibb" Smart |
 | Nunito font (Bold, ExtraBold, Black instances of the variable font) | `assets/fonts/` | SIL Open Font License 1.1 — see `assets/fonts/Nunito-OFL.txt` |
 
 `native/osble` (the Joy-Con 2 / Pro Controller 2 Bluetooth bridge) is our own code. The controller protocol it speaks comes from community reverse engineering, credited here:
 - [joycon2cpp](https://github.com/TheFrano/joycon2cpp) (MIT): the Windows init sequence and characteristic UUIDs
+- [SDL](https://github.com/libsdl-org/SDL) `SDL_hidapi_switch2.c` (zlib): axis order, IMU scales and timestamp handling
 - [linux-switch2](https://github.com/novakpetya/linux-switch2) PROTOCOL.md: the report layout, IMU scales and button bits
 - [bit-axis-labs](https://bit-axis-labs.pages.dev/blog/switch-2-ble-controllers.html): the protocol overview
 

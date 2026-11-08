@@ -458,13 +458,7 @@ end
 function love.load()
   U.resize(lg.getDimensions())
   I.init()
-  -- first time a Joy-Con 2 connects: run the tilt calibration (axes + gyro speed)
-  I.onNew = function(c)
-    if c.profile.scaleMeasured then return end
-    for i, v in ipairs(I.list) do if v == c then app.sel = i end end
-    app.firstCal = true
-    go("wizard")
-  end
+
   app.sel = (#I.list > 1) and 2 or 1 -- prefer a real controller over the mouse
   app.focus = nil
 end

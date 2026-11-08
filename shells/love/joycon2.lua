@@ -133,24 +133,47 @@ function B.read(c, frameDt)
   local defaults = B.DEFAULTS[c.ble.pid] or B.DEFAULTS[0x2069]
   for i = 0, n - 1 do
     local p = B.buf + i * 64
-    -- per-report time step from the controller's own motion timestamp (µs), so bursts
-    -- and frames with no reports don't lose or gain time
+    -- Time step per report, done the way SDL's Switch 2 driver does it: the motion
+    -- timestamp is normally microseconds (gyro full scale 34.8 rad/s) but some firmware
+    -- counts in other units (then the gyro full scale is 40 rad/s). Measure it once
+    -- against the wall clock over the first ~100 reports.
     local ts = u32(p, 0x2A)
+    local now = love.timer.getTime()
     local dt
-    if c.bleTs then
+    if not c.tsCal then c.tsCal = { n = 0, ts0 = nil, t0 = nil } end
+    local tc = c.tsCal
+    if not tc.done and ts ~= 0 then
+      if not tc.ts0 then tc.ts0, tc.t0 = ts, now
+      else
+        tc.n = tc.n + 1
+        if tc.n >= 100 and now - tc.t0 > 0.3 then
+          local span = ts - tc.ts0
+          if span < 0 then span = span + 4294967296 end
+          local perSec = span / (now - tc.t0)
+          if math.abs(perSec / 1e6 - 1) < 0.1 then
+            tc.tick, c.gyroFull = 1e-6, 34.8
+          elseif perSec > 0 then
+            tc.tick, c.gyroFull = 1 / perSec, 40.0
+          end
+          tc.done = true
+        end
+      end
+    end
+    if tc.tick and c.bleTs then
       local d = ts - c.bleTs
       if d < 0 then d = d + 4294967296 end
-      if d >= 1000 and d <= 60000 then dt = d / 1e6 end
+      local s = d * tc.tick
+      if s > 0 and s < 0.06 then dt = s end
     end
     c.bleTs = ts
-    c.bleRateT, c.bleRateN = (c.bleRateT or 0) + frameDt / n, (c.bleRateN or 0) + 1
-    if not dt then dt = (c.bleRateN > 30) and (c.bleRateT / c.bleRateN) or frameDt / n end
+    dt = dt or frameDt / n
+    local gs = (c.gyroFull or 34.8) / 32767
+    local g = { s16(p, 0x36) * gs, s16(p, 0x3A) * gs, -s16(p, 0x38) * gs }
     if B.log and B.log.ctrl == c then
       local hex = {}
       for k = 0, 0x3D do hex[#hex + 1] = string.format("%02x", p[k]) end
       B.log.lines[#B.log.lines + 1] = string.format("%.4f %.5f %s", love.timer.getTime() - B.log.t0, dt, table.concat(hex))
     end
-    local g = { s16(p, 0x36) * B.GYRO_SCALE, s16(p, 0x3A) * B.GYRO_SCALE, -s16(p, 0x38) * B.GYRO_SCALE }
     local a = { s16(p, 0x30) * B.ACCEL_SCALE, s16(p, 0x34) * B.ACCEL_SCALE, -s16(p, 0x32) * B.ACCEL_SCALE }
     c.lastRaw = { g = g, a = a }
     c:feed(dt, g, a)
