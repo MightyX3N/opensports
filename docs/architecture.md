@@ -183,7 +183,22 @@ As specified in the README. Implementation notes:
   - **Online:** one player's game acts as the server (a listen server), using the same server-authoritative model as GMod below. It uses UDP through LÖVE's built-in `lua-enet`, so desktop, Android and GMod share one net format.
   - **Reaching the host:** the host can run the **playit.gg** agent, so friends join an address like `name.at.ply.gg:port` with no port forwarding, even behind CGNAT. Custom UDP tunnels are on playit's free tier (TCP needs Premium), so we use UDP only.
   - The game gets a "Host online" screen: it shows the local port to tunnel, a field to paste the playit address, and a join-by-address box. Direct IP and LAN discovery stay available for anyone who doesn't use playit.
-  - **Decide:** bundle or auto-launch the playit agent from the game (it is open source), or just link to it. Whether the agent runs on Android needs checking.
+  - **Bundled playit agent** (decided). The game ships its own small tunnel helper, so hosting online is one button:
+    - **What we ship:** a tiny Rust program, `os-tunnel`, built on playit's open-source `agent_core` and `api_client` crates. It is not the full `playitd` service, which brings a Windows service, tray icon, IPC and installers we don't need.
+      - The playit agent is BSD-2-Clause (© Developed Methods LLC), which is compatible with GPL-3.0. We keep its licence text in `THIRD_PARTY.md` and in the game's credits screen.
+      - It uses rustls + ring, with no OpenSSL, so it cross-compiles cleanly.
+    - **Builds:** Windows x64, Linux x64/arm64 and Android arm64. On Android it is packaged as `libostunnel.so` in the APK's native library folder, which is the folder Android allows apps to run binaries from. It is started as a child process of the game.
+    - **First-time setup:**
+      1. The game asks the helper to generate a claim code.
+      2. The game opens `https://playit.gg/claim/<code>` in the browser, where the player logs in or creates a free playit account and approves.
+      3. The helper exchanges the code for the agent secret, and the game saves it in `<save>/net/playit.secret`.
+    - **Each time you host:**
+      1. The helper makes sure a **UDP** tunnel named `opensports` exists, pointing at `127.0.0.1:<game port>`. It creates it through the API the first time and reuses it after that.
+      2. It runs the tunnel and reports the public address back to the game over stdout as JSON lines.
+      3. The game shows that address with a copy button and a short join code.
+    - **When you stop hosting** or quit the game, the helper process is stopped. The tunnel stays on the player's account for next time, so the address doesn't change.
+    - **Fallback:** if the helper can't run (blocked by antivirus or an unsupported platform), the screen falls back to direct IP, LAN and "paste your own playit address".
+    - **To check while building:** playit's terms on third-party apps embedding the agent, and whether their API wants a registered platform/agent type for us (the CLI uses `self-managed`).
 - **GMod:**
   - The server runs the core simulation and is authoritative.
   - Clients read motion locally and send **swing events** (the result of swing detection: release time, velocity, spin, aim), not raw samples. That keeps bandwidth tiny and makes cheating no easier than with mouse input.
