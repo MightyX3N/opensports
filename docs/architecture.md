@@ -183,15 +183,30 @@ As specified in the README. Implementation notes:
   - **Online:** one player's game acts as the server (a listen server), using the same server-authoritative model as GMod below. It uses UDP through LÖVE's built-in `lua-enet`, so desktop, Android and GMod share one net format.
   - **Reaching the host:** the host can run the **playit.gg** agent, so friends join an address like `name.at.ply.gg:port` with no port forwarding, even behind CGNAT. Custom UDP tunnels are on playit's free tier (TCP needs Premium), so we use UDP only.
   - The game gets a "Host online" screen: it shows the local port to tunnel, a field to paste the playit address, and a join-by-address box. Direct IP and LAN discovery stay available for anyone who doesn't use playit.
-  - **playit.gg, current plan (terms checked 2026-11-08):**
-    - playit's Terms §3.4 say the service may not be redistributed, and may not be offered "as part of a hosted, managed, bundled, white-labeled, or multi-tenant service", without prior written consent from Developed Methods LLC.
-    - The agent's *code* is BSD-2-Clause, but that licence covers the code, not use of their network. **Bundling the agent therefore needs their written permission first.**
-    - **What we ship:** a guided "Host online" screen.
-      1. A link to the official playit download.
-      2. Steps to create a UDP tunnel to the game's port, with the port shown and a copy button.
-      3. A field to paste the resulting `*.ply.gg` address, which the game remembers and shows as a join code.
-      - The player uses playit's own app under their own account, which is ordinary use.
-    - **Bundling is not being pursued**, so the guided screen above is the final design. The game never ships or runs playit's code; it only links to it.
+  - **playit.gg: one-button hosting through the official app** (terms checked 2026-11-08):
+    - **Why it's built this way:** playit's Terms §3.4 forbid offering their service bundled into another product without written consent. So the game never ships or embeds playit code. Instead it downloads playit's own official release on demand and drives it, the same as a player installing it themselves.
+    - **When the player presses "Host online"** (or "Invite"), the game runs the steps below. It never downloads anything at game start, only when this button is pressed.
+      1. **Find playit:** check for an installed copy (`playit` on PATH, or the normal Windows, macOS or Linux install path) or a copy in `<save>/net/playit/`.
+      2. **If it's missing, download it:**
+         - Fetch the official release asset straight from `github.com/playit-cloud/playit-agent/releases` into `<save>/net/playit/`:
+           - Windows: `playit-windows-x86_64-signed.exe`
+           - Linux: `playit-linux-amd64` or `playit-linux-aarch64`
+         - On Windows, check the Authenticode signature before running it. Pin a known-good version, with an "update playit" button in settings.
+         - The first time, the button reads "Host online (sets up playit.gg, free)", so the download is never silent.
+      3. **First link (one time per player):**
+         - The game starts playit, which prints a claim link. The game opens that link in the browser.
+         - The player signs in or creates a free playit account and approves. This one sign-in can't be skipped: playit requires it, and it ties the tunnel to the player's own account.
+      4. **Tunnel:**
+         - The game finds the secret with `playit secret-path`.
+         - Through playit's API, it makes sure one **UDP** tunnel named `opensports` exists for `127.0.0.1:<game port>`. It is created once and reused, so the address never changes.
+      5. **Run:**
+         - Start playit in stdout mode and read the tunnel address.
+         - Show it with **Copy** and **Invite** buttons, plus a short join code.
+         - Stop playit when hosting ends, unless "keep running" is ticked.
+    - **Android:**
+      - playit publishes no Android build, and Android 10+ won't run downloaded binaries. So Android players can **join** playit-hosted games but host only by LAN or direct IP.
+      - If playit later ships an Android app, the game can hand off to it with an intent.
+    - **Credit:** playit gets credited on the host screen and in the credits ("Online hosting via playit.gg").
     - **Fallbacks always available:** direct IP, LAN discovery, paste-any-address.
 - **GMod:**
   - The server runs the core simulation and is authoritative.
