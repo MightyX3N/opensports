@@ -225,7 +225,21 @@ static void connectThread(std::shared_ptr<Pad> p) {
 API int osble_version() { return 1; }
 
 // Run WinRT work on a fresh MTA thread: the game's main thread may not have COM set up.
+// A parked thread keeps the process MTA alive for the DLL's lifetime, so WinRT objects
+// created on short-lived worker threads (watcher, devices) stay valid.
+static void keepMtaAlive() {
+  static std::once_flag once;
+  std::call_once(once, [] {
+    std::thread([] {
+      init_apartment(apartment_type::multi_threaded);
+      for (;;) std::this_thread::sleep_for(std::chrono::hours(24));
+    }).detach();
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  });
+}
+
 template <class F> static void onMta(F&& f) {
+  keepMtaAlive();
   std::thread([&] { init_apartment(apartment_type::multi_threaded); f(); uninit_apartment(); }).join();
 }
 
@@ -275,6 +289,7 @@ API int osble_poll(osble_event* out, int max) {
 }
 
 API int osble_connect(uint64_t addr, int pid) {
+  keepMtaAlive();
   auto p = std::make_shared<Pad>();
   {
     std::lock_guard<std::mutex> lk(g_m);
