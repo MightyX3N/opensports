@@ -89,18 +89,33 @@ Depth varies by sport:
 - Canoe: see `BoatParam.dat` above. Paddle force and stroke timing per boat size; strokes push the boat and damping slows it.
 - Air sports: plane flight has its own damping set and a camera path table. The controller tilt mapping wasn't traced.
 
-## Air sports (Resort)
+## Air sports (Resort) — plane
 
-The plane's tuning is one static table at `0x807D9640`, filled by `fn_80432AE0`. Each entry is a range: low, high, span and 1/span. Examples:
-- 30° → 120° (span 90)
-- 0.6 → 0.9
-- 0.01 → 0.05
+**Tuning table.** All the tuning is one table at `0x807D9640`, filled by `fn_80432AE0`. Each entry is a range: low, high, span and 1/span.
 
-These ranges map the remote's tilt and speed onto the plane's pitch, roll and throttle. The code that reads each range isn't traced yet, so the labels are still unknown.
+**Steering** (`fn_80431F98`):
+- The plane copies the remote's orientation, taken as a quaternion. It is not a tilt-to-stick mapping: the remote *is* the plane.
+- Each frame the plane's forward axis turns toward the remote's by 0.15 at low speed, falling to 0.08 at top speed.
+- Its up axis turns by 0.08, falling to 0.02. These are blended over the 0.8–1.0 band of the speed value.
+- So the plane is snappy when slow and smooth when fast.
+- The roll and pitch readings (clamped to ±1) are kept separately for animation and the HUD.
+
+**Throttle** (`fn_8042FAC4`): holding the speed button adds 0.15 per frame; there is a constant pull of −0.1. The result is clamped to 0–1.
+
+**Barrel roll:** while holding the button, a full sideways flick does a roll.
+- Flick strength ≥ 1.0 gives 3 rolls, ≥ 0.6 gives 2, otherwise 1.
+- The direction comes from the sign of the flick.
+- The roll's speed decays ×0.95 per frame.
+
+**Flight forces** (`fn_8043144C`): a real force-based model, applied to a rigid body at points.
+- Lift scales with (airspeed through the 0.5–1.0 band)⁴.
+- Drag and stability come from the other table ranges.
+- Brake and boost flags come from the input bits 4 and 8.
 
 ## Still open
 
-- Baseball: the per-pitch curve force vectors (built at run time) and the 1/2-button flag (see `baseball.md`).
-- Air sports: which range in the plane table drives which control.
+Nothing blocking. Small leftovers:
+- The golf swing value function (`fn_802DFA10`), which uses a jump table.
+- A label for each remaining range in the plane table.
 
-Tennis and golf are done (see `tennis.md`, `golf.md`).
+Tennis, golf and baseball are done (see `tennis.md`, `golf.md`, `baseball.md`).

@@ -56,10 +56,30 @@ Commonly, A and B are described as the two curve directions and A+B as the slow 
 - **"Just meet"** (perfect hit): plays an effect and counts in the stats. Hit quality = `1 + (π − angle)`, clamped to 1–3.
 - **Bounce** (`fn_8028B570`): the speed is reflected around the ground or wall normal, then multiplied by a restitution value.
 
-## Still open
-- The per-type curve force vectors are built at run time, so they need a run-time capture or a closer asm read.
-- What the 1/2-button flag does.
+## Pitch spin and ball flight (solved)
+
+**Pitch spin.** Each pitch type has two spin vectors in a table at `0x804FC0E8`, which `fn_802A19C8` builds at start-up. The ball's spin (`ball +0x78`) is blended from the first vector to the second by power:
+
+| Type | Low power | Full power |
+|---|---|---|
+| 0 | (1, 0, −1) | (2, 0, −2) |
+| 1 (A+B) | (−0.1, 0, 0.1) | (−0.1, 0, 0.1) |
+| 2 (B) | (1, 0.8, −1) | (1, 1, −1) |
+| 3 (A) | (1, −0.8, −1) | (1, −1, −1) |
+
+So type 0 is a straight backspin fastball, type 1 has almost no spin (a dropping, knuckle-style pitch), and types 2 and 3 tilt the spin axis to curve one way or the other. The table is mirrored for left-handed pitchers.
+
+**Ball step** (`fn_8028B13C`). Each frame, acceleration = the base acceleration (gravity) + Magnus + drag:
+- **Magnus** = `spin × direction of travel`, scaled:
+  - Pitched ball: 0.008 sideways, 0.0021 up/down.
+  - Batted ball: 0.002, and only while the ball is moving more forward than up or down.
+- **Drag** (batted ball only) = `−velocity × 0.0005 × (1 + max(0, 10 − |spin|))`. A ball with little spin slows down more.
+- **Spin** has its own change per frame, and the model's rotation follows it (×0.5).
+- **Delayed break:** a timer (`+0xBC`) adds an extra velocity kick and a new spin change when it runs out. Player pitches set it to −1 (off).
+
+**Buttons 1 and 2 (pitching)** switch the pitcher's throwing hand. The default comes from the Mii's handedness (`fn_802A56C0`). `fn_802A107C` puts the ball at that hand's release point, offset (6.7, 9.2, 4.1).
 
 ## For Open Sports
 - Put pitch types in a data table (speed range, break, drop, curve force) so add-ons can add new pitches.
+- Use the same Magnus + drag step for every ball so modded pitches behave consistently.
 - Make the sweet-spot curve a tunable table along the bat.
