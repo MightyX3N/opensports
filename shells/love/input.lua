@@ -87,6 +87,7 @@ local function bleConnected(entry)
     I.saveProfile(c)
   end
   c:recentre()
+  if I.onNew then I.onNew(c) end
   return c
 end
 local function bleDisconnected(c)

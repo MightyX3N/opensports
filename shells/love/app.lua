@@ -225,7 +225,7 @@ function screens.wizard.update(dt)
   local c = ctrl()
   local r = I.raw[c]
   if app.wizDone or not r then return end
-  cal.wizardFeed(app.wiz, dt, r.g)
+  cal.wizardFeed(app.wiz, dt, r.g, r.a)
   -- auto-advance: moved far enough and came most of the way back
   local _, peak = cal.wizardLive(app.wiz)
   local _, curAxisVal = nil, nil
@@ -238,6 +238,10 @@ function screens.wizard.update(dt)
       if axes then
         cal.applyAxes(c.profile, axes, signs)
         if r.a then cal.fixGravity(c.profile, r.a) end
+        local sc = cal.wizardScale(app.wiz)
+        if sc and math.abs(sc - 1) > 0.08 then c.profile.gyroScale = sc end
+        if sc then c.profile.scaleMeasured = true end
+        I.saveProfile(c)
         c.raw = m.qid(); c:recentre()
         I.saveProfile(c)
         app.wizDone = { axes = axes, signs = signs }
@@ -247,13 +251,14 @@ function screens.wizard.update(dt)
 end
 function screens.wizard.draw()
   local c = ctrl()
-  U.header("SETUP · FIX AXES", "Tilt to teach the game")
+  U.header(app.firstCal and ("FIRST TIME WITH " .. c.name:upper() .. " · 3 QUICK MOVES") or "SETUP · FIX AXES", "Tilt to teach the game")
   U.rect(80, 130, 1120, 480, 32, C.card)
   local w = app.wiz
   local step = cal.STEPS[math.min(w.step, #cal.STEPS)]
   if app.wizDone then
     U.text("All set", 112, 162, 28)
     U.text("The fix is saved for " .. c.name .. " and loads automatically next time.", 112, 202, 16, C.sub)
+    U.text(string.format("Gyro speed correction: ×%.2f", c.profile.gyroScale or 1), 112, 226, 16, C.sub)
   else
     U.text(step.title, 112, 162, 28)
     U.text(step.hint, 112, 202, 16, C.sub, "left", 520)
@@ -391,7 +396,7 @@ local actions = {
   recheck = function() screens.check.enter() end,
   uselevel = function() local c = ctrl(); c.level = app.levelSel; c.profile.level = app.levelSel; I.saveProfile(c); go("test") end,
   redo = function() cal.wizardRedo(app.wiz) end,
-  back = function() go("test") end,
+  back = function() app.firstCal = nil; go("test") end,
   reset = function() ctrl().profile.buttons = {} end,
   save = function() I.saveProfile(ctrl()); go("test") end,
 }
@@ -453,6 +458,13 @@ end
 function love.load()
   U.resize(lg.getDimensions())
   I.init()
+  -- first time a Joy-Con 2 connects: run the tilt calibration (axes + gyro speed)
+  I.onNew = function(c)
+    if c.profile.scaleMeasured then return end
+    for i, v in ipairs(I.list) do if v == c then app.sel = i end end
+    app.firstCal = true
+    go("wizard")
+  end
   app.sel = (#I.list > 1) and 2 or 1 -- prefer a real controller over the mouse
   app.focus = nil
 end
@@ -468,9 +480,20 @@ end
 function love.draw()
   U.begin()
   screens[app.screen].draw()
+  local left = I.jc2.logTick and I.jc2.logTick()
+  if left then
+    U.rect(340, 20, 600, 44, 22, C.warnSoft)
+    U.text(string.format("Recording %s… %.0f s — rest it, turn left 90° and back, tilt up 90° and back", ctrl().name, left), 340, 33, 14, C.warn, "center", 600)
+  elseif I.jc2.lastLog then
+    U.rect(240, 20, 800, 44, 22, C.greenSoft)
+    U.text("Saved " .. I.jc2.lastLog, 240, 33, 14, C.greenInk, "center", 800)
+  end
   U.finish()
 end
-function love.keypressed(k) I.keypressed(k) end
+function love.keypressed(k)
+  if k == "f5" and ctrl().ble then I.jc2.startLog(ctrl(), 12) end
+  I.keypressed(k)
+end
 function love.joystickadded(js) I.joystickadded(js) end
 function love.joystickremoved(js)
   I.joystickremoved(js)

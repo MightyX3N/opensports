@@ -132,6 +132,25 @@ do
   ok(ser.load("return os.exit()") == nil, "sandboxed load blocks globals")
 end
 
+-- 10. wizard measures a gyro that reports 8x too fast, using gravity
+do
+  local wz = cal.newWizard()
+  local dt = 1 / 100
+  local function run(axisVec, trueRate, steps)
+    local q = m.qid()
+    for _ = 1, steps do
+      q = m.qintegrate(q, m.scale(axisVec, trueRate), dt)
+      local a = m.qrot(m.qconj(q), { 0, G, 0 })
+      cal.wizardFeed(wz, dt, m.scale(axisVec, trueRate * 8), a) -- device over-reports ×8
+    end
+  end
+  run({ 1, 0, 0 }, -1.0, 60); cal.wizardNext(wz)   -- tilt forward ~34°
+  run({ 0, 1, 0 }, 1.0, 60); cal.wizardNext(wz)    -- turn left
+  run({ 0, 0, 1 }, -1.0, 60); cal.wizardNext(wz)   -- twist right
+  local sc = cal.wizardScale(wz)
+  ok(sc and math.abs(sc - 1 / 8) < 0.01, "wizard finds gyro scale ×0.125 (got " .. tostring(sc) .. ")")
+end
+
 -- 9. a slow aiming turn (5°/s) is not swallowed by auto bias, and reaches the screen edge
 do
   local c = motion.new({ id = 1 })

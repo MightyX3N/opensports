@@ -95,16 +95,27 @@ M.STEPS = {
   { id = "twist", title = "Twist the controller right", hint = "Keep pointing at the screen, roll the right side down, then bring it back.", axis = 3, sign = -1 },
 }
 
-function M.newWizard() return { step = 1, integ = {}, cur = { 0, 0, 0 }, peak = { 0, 0, 0 } } end
+function M.newWizard() return { step = 1, integ = {}, scales = {}, cur = { 0, 0, 0 }, peak = { 0, 0, 0 } } end
 
 -- Integrate raw gyro during the current step. Only the first half of the motion
 -- counts (until the integral peaks), so "and back up" doesn't cancel it.
-function M.wizardFeed(w, dt, gyroRaw)
+-- accelRaw (optional) lets the wizard measure the gyro's true scale: at the turnaround of a
+-- tilt the controller is momentarily still, so the angle between gravity at the start and
+-- at the peak is the real tilt angle, independent of the gyro.
+function M.wizardFeed(w, dt, gyroRaw, accelRaw)
   if not gyroRaw or w.step > #M.STEPS then return end
+  if accelRaw and not w.a0 then w.a0 = { accelRaw[1], accelRaw[2], accelRaw[3] } end
+  local newPeak = false
   for i = 1, 3 do
     w.cur[i] = w.cur[i] + gyroRaw[i] * dt
-    if math.abs(w.cur[i]) > math.abs(w.peak[i]) then w.peak[i] = w.cur[i] end
+    if math.abs(w.cur[i]) > math.abs(w.peak[i]) then w.peak[i] = w.cur[i]; newPeak = true end
   end
+  if newPeak and accelRaw then w.aPeak = { accelRaw[1], accelRaw[2], accelRaw[3] } end
+end
+
+local function angleBetween(a, b)
+  local d = m.dot(m.norm(a), m.norm(b))
+  return math.acos(math.max(-1, math.min(1, d)))
 end
 
 -- Strongest raw axis so far in this step, and how far it has turned (rad)
@@ -119,12 +130,27 @@ function M.wizardNext(w, minAngle)
   local _, best = M.wizardLive(w)
   if math.abs(best) < (minAngle or math.rad(25)) then return false end
   w.integ[w.step] = w.peak
+  -- gravity-based scale for the tilt steps (turning left leaves gravity unchanged)
+  if w.a0 and w.aPeak and M.STEPS[w.step].id ~= "left" then
+    local real = angleBetween(w.a0, w.aPeak)
+    if real > math.rad(15) then w.scales[#w.scales + 1] = real / math.abs(best) end
+  end
   w.step = w.step + 1
-  w.cur, w.peak = { 0, 0, 0 }, { 0, 0, 0 }
+  w.cur, w.peak, w.a0, w.aPeak = { 0, 0, 0 }, { 0, 0, 0 }, nil, nil
   return true
 end
 
-function M.wizardRedo(w) w.cur, w.peak = { 0, 0, 0 }, { 0, 0, 0 } end
+function M.wizardRedo(w) w.cur, w.peak, w.a0, w.aPeak = { 0, 0, 0 }, { 0, 0, 0 }, nil, nil end
+
+-- Average measured gyro scale factor (1 = gyro already correct), or nil if unknown
+function M.wizardScale(w)
+  if #w.scales == 0 then return nil end
+  local sum = 0
+  for _, v in ipairs(w.scales) do sum = sum + v end
+  local s = sum / #w.scales
+  if s < 0.05 or s > 20 then return nil end
+  return s
+end
 
 -- Build axis order/sign from the three recorded steps.
 -- Returns axes, signs or nil, reason.

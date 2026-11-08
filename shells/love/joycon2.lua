@@ -72,6 +72,7 @@ function B.connect(entry)
 end
 
 local function u16(p, o) return p[o] + p[o + 1] * 256 end
+local function u32(p, o) return p[o] + p[o + 1] * 256 + p[o + 2] * 65536 + p[o + 3] * 16777216 end
 local function s16(p, o) local v = u16(p, o); return v >= 32768 and v - 65536 or v end
 
 local function stick(p, o)
@@ -132,7 +133,23 @@ function B.read(c, frameDt)
   local defaults = B.DEFAULTS[c.ble.pid] or B.DEFAULTS[0x2069]
   for i = 0, n - 1 do
     local p = B.buf + i * 64
-    local dt = frameDt / n -- reports arrive in bursts; spread the frame evenly over them
+    -- per-report time step from the controller's own motion timestamp (µs), so bursts
+    -- and frames with no reports don't lose or gain time
+    local ts = u32(p, 0x2A)
+    local dt
+    if c.bleTs then
+      local d = ts - c.bleTs
+      if d < 0 then d = d + 4294967296 end
+      if d >= 1000 and d <= 60000 then dt = d / 1e6 end
+    end
+    c.bleTs = ts
+    c.bleRateT, c.bleRateN = (c.bleRateT or 0) + frameDt / n, (c.bleRateN or 0) + 1
+    if not dt then dt = (c.bleRateN > 30) and (c.bleRateT / c.bleRateN) or frameDt / n end
+    if B.log and B.log.ctrl == c then
+      local hex = {}
+      for k = 0, 0x3D do hex[#hex + 1] = string.format("%02x", p[k]) end
+      B.log.lines[#B.log.lines + 1] = string.format("%.4f %.5f %s", love.timer.getTime() - B.log.t0, dt, table.concat(hex))
+    end
     local g = { s16(p, 0x36) * B.GYRO_SCALE, s16(p, 0x3A) * B.GYRO_SCALE, -s16(p, 0x38) * B.GYRO_SCALE }
     local a = { s16(p, 0x30) * B.ACCEL_SCALE, s16(p, 0x34) * B.ACCEL_SCALE, -s16(p, 0x32) * B.ACCEL_SCALE }
     c.lastRaw = { g = g, a = a }
@@ -157,6 +174,23 @@ function B.read(c, frameDt)
       end
     end
   end
+end
+
+-- diagnostics: record raw reports of one controller for `secs` seconds to the save folder
+function B.startLog(c, secs)
+  B.log = { ctrl = c, t0 = love.timer.getTime(), secs = secs or 12, lines = { "# time dt hex(0x00..0x3d) pid=" .. string.format("%04x", c.ble.pid) } }
+end
+function B.logTick()
+  local L = B.log
+  if not L then return end
+  local left = L.secs - (love.timer.getTime() - L.t0)
+  if left <= 0 then
+    local name = os.date("jc2-log-%Y%m%d-%H%M%S.txt")
+    love.filesystem.write(name, table.concat(L.lines, "\n"))
+    B.lastLog = love.filesystem.getSaveDirectory() .. "/" .. name
+    B.log = nil
+  end
+  return left
 end
 
 function B.shutdown() if B.available then lib.osble_shutdown() end end
