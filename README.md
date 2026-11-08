@@ -3,7 +3,27 @@
 A free, open-source motion sports game in Lua, in the spirit of Wii-era party sports.
 Swing a real controller to bowl, serve, putt, slice and throw, alone or with friends.
 
-> **Status: design stage.** Architecture and art direction are being settled before any code is written.
+> **Status: early development.** The input layer and controller test app are in (build step 1 of [docs/architecture.md](docs/architecture.md)). No sports are playable yet.
+
+## Running the input test
+
+Requires [LÖVE](https://love2d.org) 12 (11.5 also runs it, but without gyro sensors).
+
+```sh
+love .
+```
+
+Connect a gyro controller (Joy-Con, Pro Controller, DualSense, DualShock 4 or a Bluetooth pad) and it shows up next to the mouse. Use the D-pad, stick, arrow keys or mouse in the menus. **Tab** / button 2 switches controllers and **R** / button 1 recentres.
+
+The app has four screens:
+- **Motion test:** the controller drawn in 3D, live gyro and accelerometer readings, and the last detected swing.
+- **Motion check:** finds a missing, frozen, slow or noisy gyro and picks a fallback level.
+- **Fix axes:** "tilt forward / turn left / twist right" repairs swapped or flipped axes.
+- **Buttons:** remaps buttons for one controller.
+
+Fixes are saved per controller in LÖVE's save folder (`input/<guid>.lua`).
+
+Core tests run under LuaJIT: `python3 tools/runlua.py tests/test_core.lua` (needs `pip install lupa`).
 
 ## Platforms
 
