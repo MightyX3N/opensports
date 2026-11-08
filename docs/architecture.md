@@ -203,9 +203,7 @@ As specified in the README. Implementation notes:
          - Start playit in stdout mode and read the tunnel address.
          - Show it with **Copy** and **Invite** buttons, plus a short join code.
          - Stop playit when hosting ends, unless "keep running" is ticked.
-    - **Android:**
-      - playit publishes no Android build, and Android 10+ won't run downloaded binaries. So Android players can **join** playit-hosted games but host only by LAN or direct IP.
-      - If playit later ships an Android app, the game can hand off to it with an intent.
+    - **Android is join-only for online play** (decided). Phones make poor hosts: mobile data, CGNAT, battery and thermal limits, and the app being paused in the background. playit also has no Android build. Android players join any desktop or GMod host, and still play local multiplayer on one device. Hosting online is hidden in the Android menus.
     - **Credit:** playit gets credited on the host screen and in the credits ("Online hosting via playit.gg").
     - **Fallbacks always available:** direct IP, LAN discovery, paste-any-address.
 - **GMod:**
