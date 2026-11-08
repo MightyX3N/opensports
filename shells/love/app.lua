@@ -96,9 +96,9 @@ function screens.test.draw()
   levelBadge(c, 112 + nw, 152)
   if c.ble then
     local nv = c.nativeVerify
-    local st = not nv and "Tracking: game (no native reports)" or
+    local st = not nv and string.format("Motion reports: %d/s", math.floor(c.rate + 0.5)) or
       (nv.trusted and "Tracking: controller's own" or string.format("Tracking: game · native check %d ok / %d bad", nv.motionGood, nv.motionBad))
-    U.text(st, 104, 192, 13, C.sub)
+    U.text(st .. (c.rateText and ("  ·  " .. c.rateText) or ""), 104, 192, 13, C.sub)
   end
   local yaw, pitch, roll = m.angles(c.orient)
   U.text(string.format("Yaw %+.0f°  Pitch %+.0f°  Roll %+.0f°", math.deg(yaw), math.deg(pitch), math.deg(roll)),

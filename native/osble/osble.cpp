@@ -61,6 +61,11 @@ struct Pad {
   uint64_t addr = 0;
   int pid = 0;
   BluetoothLEDevice device{ nullptr };
+  // Windows keeps a preferred-connection-parameters request only while this object lives.
+  // The connection interval IS the report rate (joycon2android docs/protocol.md): the
+  // default 30 ms gives ~33 motion reports/s, which fast swings can't be tracked from.
+  BluetoothLEPreferredConnectionParametersRequest connReq{ nullptr };
+  GattSession session{ nullptr };
   GattCharacteristic input{ nullptr }, side{ nullptr }, cmd{ nullptr }, reply{ nullptr }, vibcmd{ nullptr };
   std::mutex m;
   std::deque<Report> reports;
@@ -218,19 +223,23 @@ static void connectThread(std::shared_ptr<Pad> p) {
       if (sp && d.ConnectionStatus() == BluetoothConnectionStatus::Disconnected && sp->alive.exchange(false))
         push(EV_DISCONNECTED, sp->id, sp->addr, sp->pid, 0, "Disconnected");
     });
-    try {
-      p->device.RequestPreferredConnectionParameters(BluetoothLEPreferredConnectionParameters::ThroughputOptimized());
-    } catch (...) {}
-
     push(EV_STATUS, p->id, p->addr, p->pid, 0, "Starting controller");
     runInit(*p);
     // ask again after init: linux-switch2 found a fixed 7.5 ms interval is what keeps
     // motion reports flowing; Windows only lets us ask for its throughput profile
     try {
-      auto session = GattSession::FromDeviceIdAsync(p->device.BluetoothDeviceId()).get();
-      if (session) session.MaintainConnection(true);
-      p->device.RequestPreferredConnectionParameters(BluetoothLEPreferredConnectionParameters::ThroughputOptimized());
+      p->session = GattSession::FromDeviceIdAsync(p->device.BluetoothDeviceId()).get();
+      if (p->session) p->session.MaintainConnection(true);
     } catch (...) {}
+    const char* rate = "Fast updates: not supported by this Windows (needs Windows 11)";
+    try {
+      p->connReq = p->device.RequestPreferredConnectionParameters(BluetoothLEPreferredConnectionParameters::ThroughputOptimized());
+      if (p->connReq) {
+        rate = p->connReq.Status() == BluetoothLEPreferredConnectionParametersRequestStatus::Success
+          ? "Fast updates: on" : "Fast updates: refused by Windows";
+      }
+    } catch (...) {}
+    push(EV_STATUS, p->id, p->addr, p->pid, 0, rate);
     p->alive = true;
     push(EV_CONNECTED, p->id, p->addr, p->pid, 0, "Connected");
   } catch (hresult_error const& e) {
@@ -351,7 +360,10 @@ API void osble_disconnect(int id) {
     g_pads.erase(it);
   }
   p->alive = false;
-  onMta([&] { try { if (p->device) p->device.Close(); } catch (...) {} });
+  onMta([&] {
+    try { if (p->connReq) p->connReq.Close(); } catch (...) {}
+    try { if (p->device) p->device.Close(); } catch (...) {}
+  });
 }
 
 API void osble_shutdown() {

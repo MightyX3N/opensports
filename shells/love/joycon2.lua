@@ -106,6 +106,7 @@ function B.update(onConnected, onDisconnected)
       if entry then
         entry.state = "connected"
         entry.ctrl = onConnected(entry)
+        entry.ctrl.rateText = entry.rateText
         lib.osble_leds(e.id, ({ 0x01, 0x03, 0x07, 0x0F })[math.min(4, entry.ctrl.index or 1)] or 0x01)
       end
     elseif e.type == 3 then -- disconnected
@@ -118,7 +119,10 @@ function B.update(onConnected, onDisconnected)
       end
     elseif e.type == 4 then
       local entry = B.pads[e.id]
-      if entry then entry.statusText = text end
+      if entry then
+        entry.statusText = text
+        if text:find("^Fast updates") then entry.rateText = text; if entry.ctrl then entry.ctrl.rateText = text end end
+      end
     elseif e.type == 5 then
       local entry = B.pads[e.id]
       if entry then entry.state = "failed"; entry.statusText = text; entry.id = nil; B.pads[e.id] = nil
