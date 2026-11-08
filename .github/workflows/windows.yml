@@ -1,0 +1,114 @@
+# Builds a ready-to-run Windows game: LÖVE 12 (built from source, since 12.0 has no
+# official release yet) fused with the game into OpenSports.exe.
+# Download: Releases → "dev" (updated on every push to main), or the run's artifact.
+name: Windows build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # pinned LÖVE 12 development commit (bump deliberately)
+  LOVE_REF: def245102c67909f9902095af613b1ae05249b62
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: cmd
+    steps:
+    - name: Checkout game
+      uses: actions/checkout@v4
+      with:
+        path: game
+
+    - name: Cache LÖVE build
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: lovebin
+        key: love-win64-${{ env.LOVE_REF }}
+
+    - name: Install NSIS
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: winget install nsis --disable-interactivity --accept-source-agreements --accept-package-agreements
+
+    - name: Clone Megasource
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        path: megasource
+        repository: love2d/megasource
+        ref: main
+
+    - name: Clone LÖVE
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        path: megasource/libs/love
+        repository: love2d/love
+        ref: ${{ env.LOVE_REF }}
+
+    - name: Remove Strawberry Perl from PATH
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: |
+        move /y C:\Strawberry C:\Strawberry_not_in_PATH
+        exit /b 0
+
+    - name: Build LÖVE
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: |
+        cmake -Bbuild -Smegasource -T v145 -A x64 --install-prefix %CD%\install
+        if errorlevel 1 exit /b 1
+        cmake --build build --target PACKAGE --config Release -j2
+        if errorlevel 1 exit /b 1
+        mkdir lovezip
+        for %%f in (build\*.zip) do 7z x -olovezip "%%f"
+        if errorlevel 1 exit /b 1
+        mkdir lovebin
+        for /d %%d in (lovezip\*) do xcopy /e /i /y "%%d" lovebin
+        dir lovebin
+
+    - name: Package game
+      shell: pwsh
+      run: |
+        $stage = "stage"
+        New-Item -ItemType Directory $stage | Out-Null
+        Copy-Item game/main.lua, game/conf.lua $stage
+        Copy-Item -Recurse game/core, game/shells, game/assets $stage
+        Push-Location $stage
+        Compress-Archive -Path * -DestinationPath ../opensports.zip -Force
+        Pop-Location
+        Move-Item opensports.zip opensports.love -Force
+
+        $out = "OpenSports"
+        New-Item -ItemType Directory $out | Out-Null
+        Copy-Item lovebin/*.dll $out
+        Copy-Item lovebin/license.txt "$out/LOVE-license.txt" -ErrorAction SilentlyContinue
+        cmd /c copy /b lovebin\love.exe+opensports.love $out\OpenSports.exe
+        Copy-Item game/LICENSE "$out/LICENSE.txt"
+        Copy-Item game/THIRD_PARTY.md $out
+        Compress-Archive -Path $out -DestinationPath OpenSports-win64.zip -Force
+        Get-ChildItem $out
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OpenSports-win64
+        path: OpenSports-win64.zip
+
+    - name: Update "dev" release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: dev
+        name: Development build
+        prerelease: true
+        body: |
+          Latest build of `main` (${{ github.sha }}).
+          Unzip and run **OpenSports.exe**. Built on LÖVE 12 development commit ${{ env.LOVE_REF }}.
+        files: OpenSports-win64.zip
