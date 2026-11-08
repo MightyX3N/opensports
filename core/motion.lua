@@ -52,7 +52,7 @@ function M.new(opts)
   c.rateAcc, c.rateN = 0, 0
   c.kp, c.ki = 1.5, 0.01 -- Mahony gains
   c.eInt = { 0, 0, 0 }
-  c.pointerFov = { math.rad(50), math.rad(30) } -- gyro-aimed pointer: angles that reach screen edges
+  c.pointerFov = { math.rad(22), math.rad(13) } -- gyro-aimed pointer: half-angles that reach the screen edges
   return c
 end
 
@@ -82,19 +82,24 @@ function M:feed(dt, gyroRaw, accelRaw)
       self.biasSamples = nil
     end
   end
-  -- auto bias: while the controller lies still, slowly learn the gyro's zero offset
+  -- auto bias: while the controller lies truly still, learn the gyro's zero offset.
+  -- "Truly still" = the reading barely varies (sensor noise only) and gravity is steady.
+  -- A hand always trembles, so even a slow aiming turn is never learned as bias.
   if not self.biasSamples and a then
-    local gb = m.sub(g, self.bias)
-    local al = m.len(a)
-    if m.len(gb) < 0.12 and math.abs(al - G) < 0.4 then
+    local k = math.min(1, dt * 2)          -- ~0.5 s running mean / variance
+    self.gMean = self.gMean and m.add(self.gMean, m.scale(m.sub(g, self.gMean), k)) or { g[1], g[2], g[3] }
+    local d = m.sub(g, self.gMean)
+    self.gVar = (self.gVar or 1e-3) + (m.dot(d, d) - (self.gVar or 1e-3)) * k
+    local steady = self.lastA and m.len(m.sub(a, self.lastA)) < 0.08
+    if math.sqrt(self.gVar) < 0.006 and math.abs(m.len(a) - G) < 0.4 and steady and m.len(self.gMean) < 0.2 then
       self.stillT = (self.stillT or 0) + dt
-      if self.stillT > 0.8 then
-        local k = math.min(1, dt * 0.8)
-        self.bias = m.add(self.bias, m.scale(m.sub(g, self.bias), k))
+      if self.stillT > 1.0 then
+        self.bias = m.add(self.bias, m.scale(m.sub(self.gMean, self.bias), math.min(1, dt * 3)))
       end
     else
       self.stillT = 0
     end
+    self.lastA = a
   end
   g = m.sub(g, self.bias)
   self.gyro = g
@@ -121,9 +126,11 @@ function M:feed(dt, gyroRaw, accelRaw)
 
   if not self.hasPointer then -- gyro-aimed pointer
     local yaw, pitch = m.angles(self.orient)
-    self.pointer.x = m.clamp(0.5 - yaw / (2 * self.pointerFov[1]), -0.2, 1.2)
-    self.pointer.y = m.clamp(0.5 - pitch / (2 * self.pointerFov[2]), -0.2, 1.2)
-    self.pointer.valid = self.pointer.x >= 0 and self.pointer.x <= 1 and self.pointer.y >= 0 and self.pointer.y <= 1
+    local px = 0.5 - yaw / (2 * self.pointerFov[1])
+    local py = 0.5 - pitch / (2 * self.pointerFov[2])
+    -- pin to the screen edge instead of vanishing; "valid" only when really pointing at it
+    self.pointer.valid = px >= -0.25 and px <= 1.25 and py >= -0.25 and py <= 1.25
+    self.pointer.x, self.pointer.y = m.clamp(px, 0, 1), m.clamp(py, 0, 1)
   end
 
   local h = self.history

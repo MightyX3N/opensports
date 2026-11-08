@@ -132,11 +132,25 @@ do
   ok(ser.load("return os.exit()") == nil, "sandboxed load blocks globals")
 end
 
+-- 9. a slow aiming turn (5°/s) is not swallowed by auto bias, and reaches the screen edge
+do
+  local c = motion.new({ id = 1 })
+  local q, dt = m.qid(), 1 / 200
+  for i = 1, 200 * 6 do
+    local t = i * dt -- 5°/s turn plus a little hand tremor (8 Hz, mean zero)
+    local w = { 0.03 * math.sin(t * 50), math.rad(5) + 0.03 * math.sin(t * 50 + 1), 0 }
+    q = m.qintegrate(q, w, dt)
+    c:feed(dt, sample(q, w))
+  end
+  near(math.deg((m.angles(c.orient))), 30, 1.5, "slow 6 s turn at 5°/s still gives 30°")
+  ok(c.pointer.x == 0, "turning 30° left pins the pointer to the left edge")
+end
+
 -- 8. auto bias: a resting controller with a gyro offset stops drifting
 do
   local c = motion.new({ id = 1 })
   local off = { 0.05, -0.03, 0.02 }
-  for _ = 1, 800 do c:feed(1 / 200, off, { 0, G, 0 }) end
+  for _ = 1, 1200 do c:feed(1 / 200, off, { 0, G, 0 }) end
   near(c.bias[1], 0.05, 0.005, "auto bias x learned")
   near(c.bias[2], -0.03, 0.005, "auto bias y learned")
   local y0 = (m.angles(c.orient))
