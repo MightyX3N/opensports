@@ -80,6 +80,20 @@ MotionController = {
 | Phone | `love.sensor` gyro/accel on Android | — |
 | Mouse | drag gestures turned into a virtual swing | same |
 
+**Broken or wrongly mapped controllers** (common on Android boxes and tablets):
+- **Buttons:**
+  - Start from SDL's controller database.
+  - On top of that, a **remap screen** ("press the button you want for A…") stores a profile per controller GUID in `<save>/input/<guid>.lua`.
+  - Shared community profiles can ship as add-ons.
+- **Motion check:** on first connect, the game reads a few seconds of sensor data and flags a controller whose gyro is missing, frozen, noisy, or running at the wrong rate.
+- **Axis wizard:** "tilt forward / tilt left / twist" finds the order and sign of the gyro and accelerometer axes automatically, and saves the fix in the same profile. This covers the many devices that report axes swapped or flipped.
+- **Fallback levels**, picked automatically from the motion check and changeable per player in settings:
+  1. **Full motion:** orientation plus swing tracking.
+  2. **Gyro as pointer:** the gyro only aims a cursor (or the OS/Steam gyro-as-mouse is used); swings come from accelerometer flicks or a button press with stick direction.
+  3. **Stick/D-pad as pointer:** no motion at all. Aim with the stick, swing by holding a button and flicking the stick, with power from the flick speed.
+  4. **Touch/mouse gestures:** drag to aim and flick to throw.
+- **Every sport must be playable at every level.** Each sport's `logic.lua` builds its throw or swing from the `MotionController`, and the fallback levels fill in the same fields (aim, release timing, speed, spin). That way no sport needs special code per device.
+
 **Shared filters** (in `core/motion.lua`): a Mahony/Madgwick-style fusion for orientation, drift correction (from the IR pointer where present), and a ring buffer of the last ~1 s of samples, used by swing detection.
 
 **Decide (GMod motion):** a client binary module (`gmcl_opensports`) gives full motion; Steam Input gyro-as-mouse is the no-install fallback with mouse gestures. A separate OmniPlay-style hub app sending UDP to localhost is **not** possible on servers without `-allowlocalhttp`, so the module is the main path.
