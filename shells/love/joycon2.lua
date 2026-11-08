@@ -143,6 +143,14 @@ function B.read(c, frameDt)
         B.log.lines[#B.log.lines + 1] = string.format("%.4f side %s", love.timer.getTime() - B.log.t0, table.concat(hex))
       end
       local d = native.decode(function(k) return p[k] end, c.ble.pid)
+      local nv = c.nativeVerify or { timingGood = 0, timingBad = 0, motionGood = 0, motionBad = 0, gyroAngle = 0 }
+      c.nativeVerify = nv
+      if d and d.kind == "ordinary" then
+        if nv.prevTime12 then
+          if (d.time12 - nv.prevTime12) % 4096 == d.dtime8 then nv.timingGood = nv.timingGood + 1 else nv.timingBad = nv.timingBad + 1 end
+        end
+        nv.prevTime12 = d.time12
+      end
       if d and d.q then
         local q = jmap.quat(c.ble.pid, d.q)
         local l = math.sqrt(q[1] ^ 2 + q[2] ^ 2 + q[3] ^ 2 + q[4] ^ 2)
@@ -154,6 +162,16 @@ function B.read(c, frameDt)
           end
           c.nativeQ = q
           c.nativeCount = (c.nativeCount or 0) + 1
+          -- motion check: once the gyro says it turned a fair bit, the quaternion must
+          -- have turned too (catches a wrong decode that would freeze the aim)
+          if not nv.q0 then nv.q0 = q end
+          if nv.gyroAngle > 0.5 then
+            local dq = math.abs(nv.q0[1] * q[1] + nv.q0[2] * q[2] + nv.q0[3] * q[3] + nv.q0[4] * q[4])
+            local turned = 2 * math.acos(math.min(1, dq))
+            if turned > 0.3 * math.min(nv.gyroAngle, math.pi) then nv.motionGood = nv.motionGood + 1
+            else nv.motionBad = nv.motionBad + 1 end
+            nv.q0, nv.gyroAngle = q, 0
+          end
         end
       end
       goto continue
@@ -200,7 +218,14 @@ function B.read(c, frameDt)
       B.log.lines[#B.log.lines + 1] = string.format("%.4f %.5f %s", love.timer.getTime() - B.log.t0, dt, table.concat(hex))
     end
     c.lastRaw = { g = g, a = a }
-    c.extOrient = c.nativeQ -- the controller's own orientation, when its side reports arrive
+    -- the controller's own orientation, only once it has proven itself against the gyro
+    local nv = c.nativeVerify
+    if nv then
+      nv.gyroAngle = nv.gyroAngle + m.len(g) * dt
+      local timingOk = nv.timingBad == 0 or nv.timingGood > 20 * nv.timingBad
+      nv.trusted = nv.motionGood >= 3 and nv.motionBad == 0 and timingOk
+    end
+    c.extOrient = (nv and nv.trusted) and c.nativeQ or nil
     c:feed(dt, g, a)
     if i == n - 1 then
       local map = c.profile.buttons

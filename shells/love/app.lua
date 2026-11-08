@@ -94,6 +94,12 @@ function screens.test.draw()
   U.rect(104, 152, nw, 30, 15, C.card)
   U.text(c.name, 104, 159, 14, C.ink, "center", nw)
   levelBadge(c, 112 + nw, 152)
+  if c.ble then
+    local nv = c.nativeVerify
+    local st = not nv and "Tracking: game (no native reports)" or
+      (nv.trusted and "Tracking: controller's own" or string.format("Tracking: game · native check %d ok / %d bad", nv.motionGood, nv.motionBad))
+    U.text(st, 104, 192, 13, C.sub)
+  end
   local yaw, pitch, roll = m.angles(c.orient)
   U.text(string.format("Yaw %+.0f°  Pitch %+.0f°  Roll %+.0f°", math.deg(yaw), math.deg(pitch), math.deg(roll)),
     104, 582, 14, C.sub)
