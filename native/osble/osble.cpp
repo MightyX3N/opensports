@@ -224,7 +224,12 @@ static void connectThread(std::shared_ptr<Pad> p) {
 
 API int osble_version() { return 1; }
 
-API int osble_scan(int on) {
+// Run WinRT work on a fresh MTA thread: the game's main thread may not have COM set up.
+template <class F> static void onMta(F&& f) {
+  std::thread([&] { init_apartment(apartment_type::multi_threaded); f(); uninit_apartment(); }).join();
+}
+
+static int scanImpl(int on) {
   try {
     if (on) {
       if (!g_watcher) {
@@ -254,6 +259,12 @@ API int osble_scan(int on) {
     push(EV_FAILED, 0, 0, 0, 0, "Bluetooth is off or missing");
     return 0;
   }
+}
+
+API int osble_scan(int on) {
+  int r = 0;
+  onMta([&] { r = scanImpl(on); });
+  return r;
 }
 
 API int osble_poll(osble_event* out, int max) {
@@ -306,11 +317,11 @@ API void osble_disconnect(int id) {
     g_pads.erase(it);
   }
   p->alive = false;
-  try { if (p->device) p->device.Close(); } catch (...) {}
+  onMta([&] { try { if (p->device) p->device.Close(); } catch (...) {} });
 }
 
 API void osble_shutdown() {
-  try { if (g_watcher) g_watcher.Stop(); } catch (...) {}
+  onMta([] { try { if (g_watcher) g_watcher.Stop(); } catch (...) {} });
   std::vector<int> ids;
   { std::lock_guard<std::mutex> lk(g_m); for (auto& kv : g_pads) ids.push_back(kv.first); }
   for (int id : ids) osble_disconnect(id);
