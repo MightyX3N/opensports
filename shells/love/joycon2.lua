@@ -6,8 +6,12 @@ local motion = require("core.motion")
 local B = { available = false, found = {}, status = nil, pads = {} }
 
 local G = 9.80665
-B.ACCEL_SCALE = G / 4096         -- m/s² per count (~4096 counts per g)
-B.GYRO_SCALE = 40 / 32767        -- rad/s per count
+-- Scales and axis order follow SDL's Switch 2 driver (SDL_hidapi_switch2.c): 8 g and
+-- 34.8 rad/s full scale, raw (x, y, z) -> (x, z, -y). That frame has the controller's top
+-- end pointing along -z and the button face along +y, which is exactly how a Joy-Con is
+-- held like a Wii Remote, so it matches core.math's convention with no further rotation.
+B.ACCEL_SCALE = G * 8 / 32767   -- m/s² per count
+B.GYRO_SCALE = 34.8 / 32767     -- rad/s per count
 
 B.NAMES = { [0x2066] = "Joy-Con 2 (R)", [0x2067] = "Joy-Con 2 (L)", [0x2069] = "Pro Controller 2", [0x2073] = "GameCube Controller (NSO)" }
 
@@ -129,8 +133,8 @@ function B.read(c, frameDt)
   for i = 0, n - 1 do
     local p = B.buf + i * 64
     local dt = frameDt / n -- reports arrive in bursts; spread the frame evenly over them
-    local g = { s16(p, 0x36) * B.GYRO_SCALE, s16(p, 0x38) * B.GYRO_SCALE, s16(p, 0x3A) * B.GYRO_SCALE }
-    local a = { s16(p, 0x30) * B.ACCEL_SCALE, s16(p, 0x32) * B.ACCEL_SCALE, s16(p, 0x34) * B.ACCEL_SCALE }
+    local g = { s16(p, 0x36) * B.GYRO_SCALE, s16(p, 0x3A) * B.GYRO_SCALE, -s16(p, 0x38) * B.GYRO_SCALE }
+    local a = { s16(p, 0x30) * B.ACCEL_SCALE, s16(p, 0x34) * B.ACCEL_SCALE, -s16(p, 0x32) * B.ACCEL_SCALE }
     c.lastRaw = { g = g, a = a }
     c:feed(dt, g, a)
     if i == n - 1 then

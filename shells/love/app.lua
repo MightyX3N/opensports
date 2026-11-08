@@ -25,7 +25,7 @@ local screens = {}
 local function footer(items)
   if app.focus == nil then app.focus = #items end -- default focus: the main action
   local hits = {}
-  hits.back = U.backButton(80, 640, app.focus == 0)
+  hits.back = U.backButton(80, 640, app.focus == 0, app.screen == "test" and "Quit" or "Back")
   local x = 1200
   for i = #items, 1, -1 do
     local it = items[i]
@@ -406,7 +406,8 @@ local function activate(i)
 end
 
 local function navigate(nav)
-  if nav.b and not app.listening then activate(0); return end
+  -- B goes back from setup screens; on the test screen it does nothing (B/ZR is a game button)
+  if nav.b and not app.listening and app.screen ~= "test" then activate(0); return end
   if app.screen == "check" and app.report then
     if nav.up then app.levelSel = math.max(1, app.levelSel - 1) end
     if nav.down then app.levelSel = math.min(4, app.levelSel + 1) end

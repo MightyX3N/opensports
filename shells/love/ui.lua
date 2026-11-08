@@ -112,13 +112,14 @@ function U.pill(label, x, y, style, focused, w)
   return { x = x, y = y, w = w, h = h }
 end
 
-function U.backButton(x, y, focused)
-  local w = U.textWidth("Back", 18) + 80
+function U.backButton(x, y, focused, label)
+  label = label or "Back"
+  local w = U.textWidth(label, 18) + 80
   U.rect(x, y + 4, w, 48, 24, U.col.shadow)
   U.rect(x, y, w, 48, 24, U.col.card)
   lg.setColor(U.col.ink); lg.circle("fill", x + 28, y + 24, 16)
   U.text("B", x + 12, y + 13, 16, U.col.card, "center", 32)
-  U.text("Back", x + 56, y + 13, 18)
+  U.text(label, x + 56, y + 13, 18)
   if focused then U.focus(x, y, w, 48, 24) end
   return { x = x, y = y, w = w, h = 48 }
 end

@@ -82,6 +82,20 @@ function M:feed(dt, gyroRaw, accelRaw)
       self.biasSamples = nil
     end
   end
+  -- auto bias: while the controller lies still, slowly learn the gyro's zero offset
+  if not self.biasSamples and a then
+    local gb = m.sub(g, self.bias)
+    local al = m.len(a)
+    if m.len(gb) < 0.12 and math.abs(al - G) < 0.4 then
+      self.stillT = (self.stillT or 0) + dt
+      if self.stillT > 0.8 then
+        local k = math.min(1, dt * 0.8)
+        self.bias = m.add(self.bias, m.scale(m.sub(g, self.bias), k))
+      end
+    else
+      self.stillT = 0
+    end
+  end
   g = m.sub(g, self.bias)
   self.gyro = g
 

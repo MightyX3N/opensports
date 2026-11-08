@@ -132,5 +132,17 @@ do
   ok(ser.load("return os.exit()") == nil, "sandboxed load blocks globals")
 end
 
+-- 8. auto bias: a resting controller with a gyro offset stops drifting
+do
+  local c = motion.new({ id = 1 })
+  local off = { 0.05, -0.03, 0.02 }
+  for _ = 1, 800 do c:feed(1 / 200, off, { 0, G, 0 }) end
+  near(c.bias[1], 0.05, 0.005, "auto bias x learned")
+  near(c.bias[2], -0.03, 0.005, "auto bias y learned")
+  local y0 = (m.angles(c.orient))
+  for _ = 1, 200 do c:feed(1 / 200, off, { 0, G, 0 }) end
+  near(math.deg((m.angles(c.orient)) - y0), 0, 0.2, "no yaw drift once bias is learned")
+end
+
 print(string.format("%d passed, %d failed", passes, fails))
 if fails > 0 then error("tests failed") end
