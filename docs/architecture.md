@@ -178,7 +178,12 @@ As specified in the README. Implementation notes:
 
 ## 9. Multiplayer
 
-- **Desktop/Android:** local multiplayer (several controllers on one screen) first. Online play is not in the first versions.
+- **Desktop/Android:**
+  - Local multiplayer (several controllers on one screen) comes first.
+  - **Online:** one player's game acts as the server (a listen server), using the same server-authoritative model as GMod below. It uses UDP through LÖVE's built-in `lua-enet`, so desktop, Android and GMod share one net format.
+  - **Reaching the host:** the host can run the **playit.gg** agent, so friends join an address like `name.at.ply.gg:port` with no port forwarding, even behind CGNAT. Custom UDP tunnels are on playit's free tier (TCP needs Premium), so we use UDP only.
+  - The game gets a "Host online" screen: it shows the local port to tunnel, a field to paste the playit address, and a join-by-address box. Direct IP and LAN discovery stay available for anyone who doesn't use playit.
+  - **Decide:** bundle or auto-launch the playit agent from the game (it is open source), or just link to it. Whether the agent runs on Android needs checking.
 - **GMod:**
   - The server runs the core simulation and is authoritative.
   - Clients read motion locally and send **swing events** (the result of swing detection: release time, velocity, spin, aim), not raw samples. That keeps bandwidth tiny and makes cheating no easier than with mouse input.
