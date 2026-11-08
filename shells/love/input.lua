@@ -4,6 +4,7 @@
 --   * mouse / touch (gesture level)
 -- Wii Remote (DolphinBar) and Joy-Con 2 backends come later (build order step 6).
 local motion = require("core.motion")
+local jc2 = require("shells.love.joycon2")
 local ser = require("core.serialize")
 local I = { list = {}, byJoystick = {}, raw = {}, nav = {}, listeners = {} }
 
@@ -66,6 +67,21 @@ function I.init()
     end
   end
   for _, js in ipairs(love.joystick.getJoysticks()) do I.joystickadded(js) end
+  jc2.init()
+  I.jc2 = jc2
+end
+
+-- Switch 2 controllers connected by the game itself over Bluetooth LE
+local function bleConnected(entry)
+  local guid = string.format("jc2-%012x", tonumber(entry.addr))
+  local c = add(motion.new({ id = "ble" .. entry.id, kind = "joycon2", name = entry.name, guid = guid,
+    profile = I.loadProfile(guid) }))
+  c.ble = entry
+  return c
+end
+local function bleDisconnected(c)
+  for i, v in ipairs(I.list) do if v == c then table.remove(I.list, i) break end end
+  for i, v in ipairs(I.list) do v.index = i end
 end
 
 function I.joystickadded(js)
@@ -141,8 +157,12 @@ local function readButtons(c)
 end
 
 function I.update(dt)
+  jc2.update(bleConnected, bleDisconnected)
   for _, c in ipairs(I.list) do
-    if c ~= I.mouse then
+    if c.ble then
+      jc2.read(c, dt)
+      I.raw[c] = c.lastRaw
+    elseif c ~= I.mouse then
       readButtons(c)
       local g, a = readRaw(c)
       I.raw[c] = { g = g, a = a }
@@ -173,7 +193,11 @@ local KEYS = { up = "up", down = "down", left = "left", right = "right",
 function I.keypressed(key) if KEYS[key] then I.nav[KEYS[key]] = true end end
 
 -- raw button capture for the remap screen
-function I.capture(fn) I.capturing = fn end
+function I.capture(fn, c)
+  if c and c.ble then c.capture = function(button) fn(c, button) end; return end
+  I.capturing = fn
+end
+function I.shutdown() jc2.shutdown() end
 function I.gamepadpressed(js, button)
   if I.capturing and I.byJoystick[js] then local f = I.capturing; I.capturing = nil; f(I.byJoystick[js], button) end
 end

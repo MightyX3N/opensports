@@ -142,7 +142,7 @@ function screens.test.draw()
   stat(906, "SPIN", s and string.format("%+.1f %s", s.spin, s.spin >= 0 and "right" or "left") or "—")
   stat(1046, "AIM", s and string.format("%.0f° %s", math.abs(math.deg(s.aim)), s.aim >= 0 and "left" or "right") or "—")
 
-  footer({ { "Buttons", "remap" }, { "Motion check", "check" }, { "Recentre", "recentre" }, { "Next controller", "next", nil } })
+  footer({ { "Connect Joy-Con 2", "pair" }, { "Buttons", "remap" }, { "Motion check", "check" }, { "Recentre", "recentre" }, { "Next controller", "next", nil } })
 end
 
 function screens.test.update(dt)
@@ -309,7 +309,8 @@ function screens.remap.draw()
       U.rect(470, y + 12, 150, 32, 16, C.warnSoft)
       U.text("Press a button…", 470, y + 18, 15, C.warn, "center", 150)
     else
-      local b = c.profile.buttons[act] or I.DEFAULT_BUTTONS[act]
+      local b = c.profile.buttons[act] or (c.ble and (I.jc2.DEFAULTS[c.ble.pid] or {})[act]) or I.DEFAULT_BUTTONS[act]
+      b = b:gsub("^jc:", "")
       local bw = math.max(38, U.textWidth(b:upper(), 16) + 20)
       lg.setColor(C.ink); lg.rectangle("fill", 622 - bw, y + 9, bw, 38, 19, 19)
       U.text(b:upper(), 622 - bw, y + 19, 16, C.card, "center", bw)
@@ -320,14 +321,62 @@ function screens.remap.draw()
   U.rect(680, 130, 520, 420, 32, C.card)
   U.text(app.listening and ("Press the button you want for " .. app.listening:upper())
     or "Pick an action, then press its new button", 712, 162, 24, C.ink, "center", 456)
-  U.text(c.joystick and "Saved for this exact controller" or "This device has no buttons to remap", 712, 500, 14, C.sub, "center", 456)
+  U.text((c.joystick or c.ble) and "Saved for this exact controller" or "This device has no buttons to remap", 712, 500, 14, C.sub, "center", 456)
   footer({ { "Reset to default", "reset" }, { "Save for this controller", "save", "primary" } })
+end
+
+------------------------------------------------------------ Pair Joy-Con 2
+screens.pair = {}
+function screens.pair.enter() app.pairSel = 1; if I.jc2.available then I.jc2.scan(true) end end
+function screens.pair.leave() if I.jc2.available then I.jc2.scan(false) end end
+function screens.pair.draw()
+  local B = I.jc2
+  U.header("SETUP · BLUETOOTH", "Connect Joy-Con 2")
+  U.rect(80, 130, 540, 480, 32, C.card)
+  U.text("Press the SYNC button", 110, 160, 26)
+  U.text("It's the small round button on the flat rail side of each Joy-Con 2 (or next to the USB port on a Pro Controller 2). The lights will run back and forth.",
+    110, 200, 16, C.sub, "left", 480)
+  -- rail illustration
+  U.rect(150, 300, 400, 120, 22, C.soft)
+  U.rect(200, 340, 300, 40, 20, C.red)
+  U.rect(200, 340, 300, 12, 6, { 0.949, 0.416, 0.384 })
+  lg.setColor(C.ink); lg.circle("fill", 282, 360, 8)
+  for i = 0, 3 do lg.setColor(i == 1 and C.green or C.line); lg.circle("fill", 380 + i * 22, 360, 6) end
+  lg.setColor(C.blue); lg.setLineWidth(3); lg.circle("line", 282, 360, 18); lg.setLineWidth(1)
+  U.text("SYNC", 252, 392, 13, C.blueDark, "center", 60)
+  U.text("Windows doesn't list Joy-Con 2 under Bluetooth settings — the game connects to them directly. Press SYNC every time you connect.",
+    110, 446, 14, C.sub, "left", 480)
+
+  U.text("CONTROLLERS NEARBY", 652, 130, 16, C.sub)
+  app.pairHits = {}
+  if not B.available then
+    U.rect(652, 160, 548, 90, 20, C.warnSoft)
+    U.text(B.reason or "Bluetooth isn't available", 676, 180, 17, C.warn, "left", 500)
+  else
+    if #B.found == 0 then
+      U.rect(652, 160, 548, 64, 20, C.card)
+      U.text(B.status or "Searching…", 676, 182, 15, C.sub, "left", 500)
+    end
+    for i, e in ipairs(B.found) do
+      local y = 160 + (i - 1) * 76
+      U.rect(652, y, 548, 64, 20, C.card)
+      U.text(e.name, 676, y + 12, 17)
+      local st = ({ found = "Press A to connect", connecting = e.statusText or "Connecting…", connected = "Connected",
+        failed = e.statusText or "Failed — press SYNC and try again", lost = "Disconnected" })[e.state] or e.state
+      U.text(st, 676, y + 34, 14, e.state == "connected" and C.greenInk or (e.state == "failed" and C.warn or C.sub), "left", 380)
+      U.text(string.format("%d dBm", e.rssi), 1050, y + 22, 14, C.sub, "right", 130)
+      if app.pairSel == i and app.focus == -1 then U.focus(652, y, 548, 64, 20) end
+      app.pairHits[i] = { x = 652, y = y, w = 548, h = 64 }
+    end
+  end
+  footer({ { "Search again", "rescan" }, { "Done", "back", "primary" } })
 end
 
 ------------------------------------------------------------ actions
 local function go(name)
+  if screens[app.screen].leave then screens[app.screen].leave() end
   app.screen = name
-  app.focus = (name == "remap") and -1 or nil
+  app.focus = (name == "remap" or name == "pair") and -1 or nil
   if screens[name].enter then screens[name].enter() end
 end
 
@@ -336,6 +385,8 @@ local actions = {
   recentre = function() ctrl():recentre() end,
   check = function() go("check") end,
   remap = function() go("remap") end,
+  pair = function() go("pair") end,
+  rescan = function() I.jc2.scan(false); I.jc2.scan(true) end,
   wizard = function() go("wizard") end,
   recheck = function() screens.check.enter() end,
   uselevel = function() local c = ctrl(); c.level = app.levelSel; c.profile.level = app.levelSel; I.saveProfile(c); go("test") end,
@@ -360,19 +411,32 @@ local function navigate(nav)
     if nav.up then app.levelSel = math.max(1, app.levelSel - 1) end
     if nav.down then app.levelSel = math.min(4, app.levelSel + 1) end
   end
+  if app.screen == "pair" then
+    local nf = #I.jc2.found
+    if app.focus == -1 then
+      if nav.up then app.pairSel = math.max(1, app.pairSel - 1) end
+      if nav.down then
+        if app.pairSel >= nf then app.focus = app.footerCount else app.pairSel = app.pairSel + 1 end
+      end
+      if nav.a and I.jc2.found[app.pairSel] then I.jc2.connect(I.jc2.found[app.pairSel]) end
+      if nf == 0 then app.focus = app.footerCount end
+      if nav.b then activate(0) end
+      return
+    elseif nav.up and nf > 0 then app.focus = -1; return end
+  end
   if app.screen == "remap" then
     if app.focus == -1 then
       if nav.up then app.remapSel = math.max(1, app.remapSel - 1) end
       if nav.down then
         if app.remapSel == #I.ACTIONS then app.focus = app.footerCount else app.remapSel = app.remapSel + 1 end
       end
-      if nav.a and ctrl().joystick then
+      if nav.a and (ctrl().joystick or ctrl().ble) then
         local act = I.ACTIONS[app.remapSel]
         app.listening = act
         I.capture(function(c, button)
           if c == ctrl() then c.profile.buttons[act] = button end
           app.listening = nil
-        end)
+        end, ctrl())
       end
       return
     elseif nav.up then app.focus = -1; return end
@@ -392,6 +456,7 @@ function love.load()
   app.focus = nil
 end
 function love.resize(w, h) U.resize(w, h) end
+function love.quit() I.shutdown() end
 function love.update(dt)
   dt = math.min(dt, 0.05)
   I.update(dt)
@@ -422,6 +487,11 @@ function love.mousepressed(x, y, button)
   end
   if app.screen == "check" and app.levelHits then
     for l, h in ipairs(app.levelHits) do if U.hit(h, dx, dy) then app.levelSel = l; return end end
+  end
+  if app.screen == "pair" and app.pairHits then
+    for i, h in ipairs(app.pairHits) do
+      if U.hit(h, dx, dy) then app.focus = -1; app.pairSel = i; I.jc2.connect(I.jc2.found[i]); return end
+    end
   end
   if app.screen == "remap" and app.rowHits then
     for i, h in ipairs(app.rowHits) do

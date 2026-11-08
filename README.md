@@ -15,7 +15,7 @@ Swing a real controller to bowl, serve, putt, slice and throw, alone or with fri
 love .
 ```
 
-Connect a gyro controller (Joy-Con, Pro Controller, DualSense, DualShock 4 or a Bluetooth pad) and it shows up next to the mouse. Use the D-pad, stick, arrow keys or mouse in the menus. **Tab** / button 2 switches controllers and **R** / button 1 recentres.
+Connect a gyro controller (Joy-Con, Pro Controller, DualSense, DualShock 4 or a Bluetooth pad) and it shows up next to the mouse. **Joy-Con 2 and Pro Controller 2** don't appear in Windows Bluetooth settings. Instead, choose **Connect Joy-Con 2** in the game, press the controller's SYNC button, and pick it from the list. Use the D-pad, stick, arrow keys or mouse in the menus. **Tab** / button 2 switches controllers and **R** / button 1 recentres.
 
 The app has four screens:
 - **Motion test:** the controller drawn in 3D, live gyro and accelerometer readings, and the last detected swing.

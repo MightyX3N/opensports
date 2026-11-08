@@ -74,6 +74,13 @@ jobs:
         for /d %%d in (lovezip\*) do xcopy /e /i /y "%%d" lovebin
         dir lovebin
 
+    - name: Build osble.dll (Bluetooth LE bridge for Joy-Con 2)
+      run: |
+        cmake -S game/native/osble -B osblebuild -A x64
+        if errorlevel 1 exit /b 1
+        cmake --build osblebuild --config Release
+        if errorlevel 1 exit /b 1
+
     - name: Package game
       shell: pwsh
       run: |
@@ -89,6 +96,7 @@ jobs:
         $out = "OpenSports"
         New-Item -ItemType Directory $out | Out-Null
         Copy-Item lovebin/*.dll $out
+        Copy-Item osblebuild/Release/osble.dll $out
         Copy-Item lovebin/license.txt "$out/LOVE-license.txt" -ErrorAction SilentlyContinue
         cmd /c copy /b lovebin\love.exe+opensports.love $out\OpenSports.exe
         Copy-Item game/LICENSE "$out/LICENSE.txt"
