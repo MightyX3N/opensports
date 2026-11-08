@@ -4,7 +4,7 @@ local dsu = require("core.dsu")
 local motion = require("core.motion")
 local D = { pads = {}, host = "127.0.0.1", port = dsu.PORT }
 
-D.DEFAULT_BUTTONS = { a = "cross", b = "r2", one = "square", two = "triangle", plus = "options",
+D.DEFAULT_BUTTONS = { a = "cross", b = "r2", one = "square", two = "r1", recentre = "triangle", sclick = "l3", plus = "options",
   minus = "share", home = "ps", up = "up", down = "down", left = "left", right = "right" }
 
 function D.init()

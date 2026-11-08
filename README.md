@@ -3,9 +3,9 @@
 A free, open-source motion sports game in Lua, in the spirit of Wii-era party sports.
 Swing a real controller to bowl, serve, putt, slice and throw, alone or with friends.
 
-> **Status: early development.** The input layer and controller test app are in (build step 1 of [docs/architecture.md](docs/architecture.md)). No sports are playable yet.
+> **Status: early development.** Bowling is playable as a first prototype (10 frames, one player), alongside the controller test screens. Other sports aren't in yet. See [docs/architecture.md](docs/architecture.md) for the plan.
 
-## Running the input test
+## Playing
 
 **Windows:** download `OpenSports-win64.zip` from the [dev release](https://github.com/MightyX3N/opensports/releases/tag/dev), unzip it and run `OpenSports.exe`. The release is rebuilt on every push to `main`. The exe isn't signed, so Windows SmartScreen may warn on first run: choose *More info → Run anyway*.
 
@@ -15,9 +15,22 @@ Swing a real controller to bowl, serve, putt, slice and throw, alone or with fri
 love .
 ```
 
-Connect a gyro controller (Joy-Con, Pro Controller, DualSense, DualShock 4 or a Bluetooth pad) and it shows up next to the mouse. **Joy-Con 2 and Pro Controller 2** don't appear in Windows Bluetooth settings. Choose **Connect Joy-Con 2** in the game, press SYNC, and pick it from the list. The motion conversion is joycon2android's measured one. DSU servers (BetterJoy, DS4Windows, joycon2cpp, …) also show up automatically as **DSU pad**. Use the D-pad, stick, arrow keys or mouse in the menus. **Tab** / button 2 switches controllers and **R** / button 1 recentres.
+The game starts on the bowling lane. Bowling plays like Wii Sports bowling:
 
-The app has four screens:
+| | Joy-Con / Joy-Con 2 (R) | Mouse + keyboard |
+| --- | --- | --- |
+| Move left / right | Stick | Arrow keys |
+| Switch between moving and turning the aim | Press the stick in | Space |
+| Throw | Hold the Joy-Con upright in front of your chest, hold **ZR**, swing back and forward, let go of ZR | Drag the mouse down, then flick it up |
+| Spin | Twist your wrist as you swing | Flick sideways at the end |
+| Re-centre the aim | **X** (it also re-centres by itself while you hold still before each throw) | – |
+| Pause | **+** | Esc |
+
+A left Joy-Con uses ZL, its stick and Up. Other gyro pads use the right trigger. Every button can be changed on the Buttons screen.
+
+**Joy-Con 2 and Pro Controller 2** don't appear in Windows Bluetooth settings: pause, choose **Controllers → Connect Joy-Con 2**, press SYNC, and pick it from the list. DSU servers (BetterJoy, DS4Windows, joycon2cpp, …) also show up automatically as **DSU pad**.
+
+The controller screens (pause → **Controllers**):
 - **Motion test:** the controller drawn in 3D, live gyro and accelerometer readings, and the last detected swing.
 - **Motion check:** finds a missing, frozen, slow or noisy gyro and picks a fallback level.
 - **Fix axes:** "tilt forward / turn left / twist right" repairs swapped or flipped axes.
@@ -25,7 +38,15 @@ The app has four screens:
 
 Fixes are saved per controller in LÖVE's save folder (`input/<guid>.lua`).
 
-Core tests run under LuaJIT: `python3 tools/runlua.py tests/test_core.lua` (needs `pip install lupa`).
+## Testing
+
+Core tests run under LuaJIT: `python3 tools/runlua.py tests/test_core.lua` (needs `pip install lupa`), or `LUA_PATH="./?.lua;;" luajit tests/test_bowling.lua`.
+
+`tools/autotest/play_bowling.lua` plays a whole game of bowling headless with the mouse and a simulated Joy-Con 2 (33 motion reports a second, like the real one), checks every control and saves screenshots and a log:
+
+```sh
+xvfb-run -s "-screen 0 1280x720x24" love . --script tools/autotest/play_bowling.lua out/
+```
 
 ## Platforms
 

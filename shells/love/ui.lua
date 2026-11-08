@@ -43,8 +43,8 @@ local function weightFor(size, color)
   return "extra"
 end
 
-function U.begin()
-  lg.clear(U.col.bg)
+function U.begin(keep)
+  if not keep then lg.clear(U.col.bg) end
   lg.push()
   lg.translate(U.ox, U.oy)
   lg.scale(U.scale)

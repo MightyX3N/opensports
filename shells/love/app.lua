@@ -7,10 +7,11 @@ local swing = require("core.swing")
 local U = require("shells.love.ui")
 local I = require("shells.love.input")
 local remote = require("shells.love.remote3d")
+local bowling = require("shells.love.bowling")
 local lg = love.graphics
 local C = U.col
 
-local app = { screen = "test", sel = 1, focus = 0, hits = {}, lastSwing = nil, trace = {} }
+local app = { screen = "bowling", sel = 1, focus = 0, hits = {}, lastSwing = nil, trace = {} }
 
 local function ctrl() return I.list[app.sel] or I.list[1] end
 local function detectorFor(c)
@@ -148,11 +149,12 @@ function screens.test.draw()
   stat(906, "SPIN", s and string.format("%+.1f %s", s.spin, s.spin >= 0 and "right" or "left") or "—")
   stat(1046, "AIM", s and string.format("%.0f° %s", math.abs(math.deg(s.aim)), s.aim >= 0 and "left" or "right") or "—")
 
-  footer({ { "Connect Joy-Con 2", "pair" }, { "Buttons", "remap" }, { "Motion check", "check" }, { "Recentre", "recentre" }, { "Next controller", "next", nil } })
+  footer({ { "Connect Joy-Con 2", "pair" }, { "Buttons", "remap" }, { "Motion check", "check" }, { "Recentre", "recentre" }, { "Next", "next", nil }, { "Bowling", "bowling", "primary" } })
 end
 
 function screens.test.update(dt)
   local c = ctrl()
+  if c.pressed.recentre then c:recentre() end
   local det = detectorFor(c)
   local ev = det:update()
   if ev then app.lastSwing = ev end
@@ -309,26 +311,27 @@ function screens.remap.enter() app.remapSel = 1; app.listening = nil end
 function screens.remap.draw()
   local c = ctrl()
   U.header("SETUP · " .. c.name:upper(), "Buttons")
-  local labels = { a = "A · confirm / swing", b = "B · back / brake", one = "1 · camera", two = "2 · ready",
-    plus = "+ · pause", minus = "− · options", home = "Home · menu" }
+  local labels = { a = "A · confirm", b = "B · throw / swing (hold)", one = "1 · camera", two = "2 · next controller",
+    plus = "+ · pause", minus = "− · options", home = "Home · menu", recentre = "Re-centre aim",
+    sclick = "Stick press · move / turn" }
   app.rowHits = {}
   for i, act in ipairs(I.ACTIONS) do
-    local y = 130 + (i - 1) * 66
-    U.rect(80, y, 560, 56, 18, C.card)
-    U.text(labels[act], 98, y + 17, 18)
+    local y = 128 + (i - 1) * 54
+    U.rect(80, y, 560, 48, 16, C.card)
+    U.text(labels[act], 98, y + 13, 17)
     if app.listening == act then
-      U.rect(470, y + 12, 150, 32, 16, C.warnSoft)
-      U.text("Press a button…", 470, y + 18, 15, C.warn, "center", 150)
+      U.rect(470, y + 8, 150, 32, 16, C.warnSoft)
+      U.text("Press a button…", 470, y + 14, 15, C.warn, "center", 150)
     else
       local b = c.profile.buttons[act] or (c.ble and (I.jc2.DEFAULTS[c.ble.pid] or {})[act])
         or (c.dsu and I.dsu.DEFAULT_BUTTONS[act]) or I.DEFAULT_BUTTONS[act]
       b = b:gsub("^jc:", ""):gsub("^dsu:", "")
       local bw = math.max(38, U.textWidth(b:upper(), 16) + 20)
-      lg.setColor(C.ink); lg.rectangle("fill", 622 - bw, y + 9, bw, 38, 19, 19)
-      U.text(b:upper(), 622 - bw, y + 19, 16, C.card, "center", bw)
+      lg.setColor(C.ink); lg.rectangle("fill", 622 - bw, y + 7, bw, 34, 17, 17)
+      U.text(b:upper(), 622 - bw, y + 15, 16, C.card, "center", bw)
     end
-    if app.remapSel == i and app.focus == -1 then U.focus(80, y, 560, 56, 18) end
-    app.rowHits[i] = { x = 80, y = y, w = 560, h = 56 }
+    if app.remapSel == i and app.focus == -1 then U.focus(80, y, 560, 48, 16) end
+    app.rowHits[i] = { x = 80, y = y, w = 560, h = 48 }
   end
   U.rect(680, 130, 520, 420, 32, C.card)
   U.text(app.listening and ("Press the button you want for " .. app.listening:upper())
@@ -384,6 +387,12 @@ function screens.pair.draw()
   footer({ { "Search again", "rescan" }, { "Done", "back", "primary" } })
 end
 
+------------------------------------------------------------ Bowling
+screens.bowling = {
+  update = bowling.update, draw = bowling.drawHud, draw3d = bowling.draw3d, nav = bowling.nav,
+  mousepressed = bowling.mousepressed, mousemoved = bowling.mousemoved, mousereleased = bowling.mousereleased,
+}
+
 ------------------------------------------------------------ actions
 local function go(name)
   if screens[app.screen].leave then screens[app.screen].leave() end
@@ -393,6 +402,7 @@ local function go(name)
 end
 
 local actions = {
+  bowling = function() go("bowling") end,
   next = function() app.sel = app.sel % #I.list + 1; app.lastSwing = nil end,
   recentre = function() ctrl():recentre() end,
   check = function() go("check") end,
@@ -418,6 +428,7 @@ local function activate(i)
 end
 
 local function navigate(nav)
+  if screens[app.screen].nav then screens[app.screen].nav(nav); return end
   -- B goes back from setup screens; on the test screen it does nothing (B/ZR is a game button)
   if nav.b and not app.listening and app.screen ~= "test" then activate(0); return end
   if app.screen == "check" and app.report then
@@ -468,6 +479,17 @@ function love.load()
 
   app.sel = (#I.list > 1) and 2 or 1 -- prefer a real controller over the mouse
   app.focus = nil
+  -- what a game screen may use from the app
+  local env = {
+    ctrl = ctrl, go = go, quit = function() love.event.quit() end,
+    useMouse = function() for i, c in ipairs(I.list) do if c == I.mouse then app.sel = i end end end,
+    use = function(c) for i, v in ipairs(I.list) do if v == c then app.sel = i end end end,
+    list = function() return I.list end,
+  }
+  screens.bowling.enter = function() bowling.enter(env) end
+  -- a newly connected controller becomes the one in play
+  I.onNew = function(c) for i, v in ipairs(I.list) do if v == c then app.sel = i end end end
+  if screens[app.screen].enter then screens[app.screen].enter() end
 end
 function love.resize(w, h) U.resize(w, h) end
 function love.quit() I.shutdown() end
@@ -479,8 +501,16 @@ function love.update(dt)
   I.endFrame()
 end
 function love.draw()
-  U.begin()
-  screens[app.screen].draw()
+  local sc = screens[app.screen]
+  if sc.draw3d then
+    lg.clear(U.col.bg)
+    lg.origin()
+    sc.draw3d()
+    U.begin(true)
+  else
+    U.begin()
+  end
+  sc.draw()
   local left = I.jc2.logTick and I.jc2.logTick()
   if left then
     U.rect(340, 20, 600, 44, 22, C.warnSoft)
@@ -506,6 +536,7 @@ function love.joystickpressed(js, b) I.joystickpressed(js, b) end
 -- mouse / touch: menu clicks, and gesture swings on the mouse controller
 function love.mousepressed(x, y, button)
   local dx, dy = U.toDesign(x, y)
+  if screens[app.screen].mousepressed then screens[app.screen].mousepressed(dx, dy); return end
   for i = 0, app.footerCount or 0 do
     local h = i == 0 and app.hits.back or app.hits[i]
     if U.hit(h, dx, dy) then activate(i); return end
@@ -530,11 +561,13 @@ end
 function love.mousemoved(x, y)
   local c = I.mouse
   if not c then return end
+  if screens[app.screen].mousemoved then screens[app.screen].mousemoved(U.toDesign(x, y)) end
   local w, h = lg.getDimensions()
   c.pointer.x, c.pointer.y, c.pointer.valid = x / w, y / h, true
   if c.drag then c.drag[#c.drag + 1] = { x = x, y = y, t = love.timer.getTime() } end
 end
 function love.mousereleased(x, y)
+  if screens[app.screen].mousereleased then screens[app.screen].mousereleased(U.toDesign(x, y)); return end
   local c = I.mouse
   if c and c.drag then
     local ev = detectorFor(c):gesture(c.drag, 400 * U.scale)

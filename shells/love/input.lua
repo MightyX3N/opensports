@@ -10,11 +10,13 @@ local ser = require("core.serialize")
 local I = { list = {}, byJoystick = {}, raw = {}, nav = {}, listeners = {} }
 
 -- logical button -> default SDL gamepad button
+-- (SDL names buttons by position: "y" is the top face button, which Nintendo labels X)
 I.DEFAULT_BUTTONS = {
-  a = "a", b = "b", one = "x", two = "y", plus = "start", minus = "back", home = "guide",
+  a = "a", b = "b", one = "x", two = "rightshoulder", plus = "start", minus = "back", home = "guide",
+  recentre = "y", sclick = "leftstick",
   up = "dpup", down = "dpdown", left = "dpleft", right = "dpright",
 }
-I.ACTIONS = { "a", "b", "one", "two", "plus", "minus", "home" }
+I.ACTIONS = { "a", "b", "recentre", "sclick", "one", "two", "plus", "minus", "home" }
 
 local function safeName(s) return (s or "unknown"):gsub("[^%w%-]", "_") end
 
@@ -168,6 +170,9 @@ local function readButtons(c)
     elseif js:isGamepad() then down = js:isGamepadDown(b) end
     c:setButton(logical, down)
   end
+  -- on gamepads the right trigger also works as B (the throw / swing button sits under the
+  -- index finger, like the Wii Remote's B)
+  if js:isGamepad() and not map.b and js:getGamepadAxis("triggerright") > 0.5 then c:setButton("b", true) end
   if js:isGamepad() then
     c.stick = { js:getGamepadAxis("leftx"), -js:getGamepadAxis("lefty") }
   elseif js:getAxisCount() >= 2 then

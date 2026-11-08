@@ -24,12 +24,14 @@ B.BUTTONS = {
   MINUS = { 1, 0 }, PLUS = { 1, 1 }, RSTICK = { 1, 2 }, LSTICK = { 1, 3 }, HOME = { 1, 4 }, CAPTURE = { 1, 5 }, C = { 1, 6 },
   DOWN = { 2, 0 }, UP = { 2, 1 }, RIGHT = { 2, 2 }, LEFT = { 2, 3 }, SR_L = { 2, 4 }, SL_L = { 2, 5 }, L = { 2, 6 }, ZL = { 2, 7 },
 }
--- held upright like a Wii Remote: the face button under the thumb is A, the back trigger is B
+-- held upright like a Wii Remote: the face button under the thumb is A, the back trigger
+-- (under the index finger) is B, the top face button re-centres the aim, pressing the stick
+-- in is "sclick"
 B.DEFAULTS = {
-  [0x2066] = { a = "A", b = "ZR", one = "B", two = "Y", plus = "PLUS", minus = "X", home = "HOME" },
-  [0x2067] = { a = "RIGHT", b = "ZL", one = "DOWN", two = "LEFT", plus = "UP", minus = "MINUS", home = "CAPTURE" },
+  [0x2066] = { a = "A", b = "ZR", one = "B", two = "Y", plus = "PLUS", recentre = "X", sclick = "RSTICK", home = "HOME" },
+  [0x2067] = { a = "RIGHT", b = "ZL", one = "DOWN", two = "LEFT", plus = "MINUS", recentre = "UP", sclick = "LSTICK", home = "CAPTURE" },
   [0x2069] = { a = "A", b = "B", one = "X", two = "Y", plus = "PLUS", minus = "MINUS", home = "HOME",
-    up = "UP", down = "DOWN", left = "LEFT", right = "RIGHT" },
+    recentre = "X", sclick = "LSTICK", up = "UP", down = "DOWN", left = "LEFT", right = "RIGHT" },
 }
 B.DEFAULTS[0x2073] = B.DEFAULTS[0x2069]
 
@@ -233,7 +235,8 @@ function B.read(c, frameDt)
     c:feed(dt, g, a)
     if i == n - 1 then
       local map = c.profile.buttons
-      for logical in pairs({ a = 1, b = 1, one = 1, two = 1, plus = 1, minus = 1, home = 1, up = 1, down = 1, left = 1, right = 1 }) do
+      for logical in pairs({ a = 1, b = 1, one = 1, two = 1, plus = 1, minus = 1, home = 1, recentre = 1, sclick = 1,
+        up = 1, down = 1, left = 1, right = 1 }) do
         local name = map[logical] and map[logical]:match("^jc:(.+)$") or defaults[logical]
         local bb = name and B.BUTTONS[name]
         c:setButton(logical, bb and bit.band(p[4 + bb[1]], bit.lshift(1, bb[2])) ~= 0 or false)

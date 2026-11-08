@@ -36,6 +36,7 @@ jobs:
         python tools/runlua.py tests/test_jc2_log.lua
         python tools/runlua.py tests/test_jc2_native.lua
         python tools/runlua.py tests/test_dsu.lua
+        python tools/runlua.py tests/test_bowling.lua
 
     - name: Cache LÖVE build
       id: cache
@@ -97,7 +98,7 @@ jobs:
         $stage = "stage"
         New-Item -ItemType Directory $stage | Out-Null
         Copy-Item game/main.lua, game/conf.lua $stage
-        Copy-Item -Recurse game/core, game/shells, game/assets $stage
+        Copy-Item -Recurse game/core, game/shells, game/sports, game/assets $stage
         Push-Location $stage
         Compress-Archive -Path * -DestinationPath ../opensports.zip -Force
         Pop-Location

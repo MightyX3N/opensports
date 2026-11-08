@@ -138,8 +138,9 @@ end
 function M:endFrame() self.pressed, self.released = {}, {} end
 
 -- Point at the screen centre and call this: current heading becomes "forward".
-function M:recentre()
-  local yaw = m.angles(self.raw)
+-- A sport can pass its own heading (e.g. bowling's ready pose holds the controller upright).
+function M:recentre(yaw)
+  yaw = yaw or m.angles(self.raw)
   self.yawOffset = yaw
   self.orient = m.qmul(m.qaxis(m.UP, -yaw), self.raw)
   self.pointer.x, self.pointer.y = 0.5, 0.5
