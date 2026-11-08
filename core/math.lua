@@ -72,6 +72,20 @@ function M.qslerp(a, b, t)
   return { a[1] * wa + b[1] * wb, a[2] * wa + b[2] * wb, a[3] * wa + b[3] * wb, a[4] * wa + b[4] * wb }
 end
 
+-- shortest rotation taking unit vector a onto unit vector b
+function M.qfromto(a, b)
+  a, b = M.norm(a), M.norm(b)
+  local d = M.dot(a, b)
+  if d > 0.999999 then return M.qid() end
+  if d < -0.999999 then
+    local axis = M.cross({ 1, 0, 0 }, a)
+    if M.len(axis) < 1e-6 then axis = M.cross({ 0, 1, 0 }, a) end
+    return M.qaxis(axis, math.pi)
+  end
+  local c = M.cross(a, b)
+  return M.qnorm({ 1 + d, c[1], c[2], c[3] })
+end
+
 -- Controller convention: x = right, y = up (top face), z = towards the player.
 -- Pointing at the screen means the controller's -z points along world -z.
 M.FORWARD = { 0, 0, -1 }

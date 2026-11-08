@@ -49,6 +49,10 @@ static const wchar_t* REPLY_UUID = L"c765a961-d9d8-4d36-a20a-5315b111836a";   //
 static const wchar_t* VIBCMD_L = L"ce49a830-dced-48ae-931e-c8cf88aadbea";     // vibration + command (JC2 L)
 static const wchar_t* VIBCMD_R = L"65a724b3-f1e7-4a61-8078-a342376b27ff";     // vibration + command (JC2 R)
 static const wchar_t* VIBCMD_PRO = L"3dacbc7e-6955-40b5-8eaf-6f9809e8b379";   // Pro Controller 2
+// native side reports (0x07 L / 0x08 R): carry the controller's own orientation quaternion
+static const wchar_t* SIDE_L = L"cc1bbbb5-7354-4d32-a716-a81cb241a32a";
+static const wchar_t* SIDE_R = L"d5a9e01e-2ffc-4cca-b20c-8b67142bf442";
+static const wchar_t* SIDE_PRO = L"7492866c-ec3e-4619-8258-32755ffcc0f8";
 
 struct Report { uint8_t data[64]; };
 
@@ -57,7 +61,7 @@ struct Pad {
   uint64_t addr = 0;
   int pid = 0;
   BluetoothLEDevice device{ nullptr };
-  GattCharacteristic input{ nullptr }, cmd{ nullptr }, reply{ nullptr }, vibcmd{ nullptr };
+  GattCharacteristic input{ nullptr }, side{ nullptr }, cmd{ nullptr }, reply{ nullptr }, vibcmd{ nullptr };
   std::mutex m;
   std::deque<Report> reports;
   std::atomic<bool> alive{ false };
@@ -186,18 +190,25 @@ static void connectThread(std::shared_ptr<Pad> p) {
     p->vibcmd = findChar(chars, p->pid == 0x2067 ? VIBCMD_L : (p->pid == 0x2066 ? VIBCMD_R : VIBCMD_PRO));
     if (!p->input || !p->cmd) { push(EV_FAILED, p->id, p->addr, p->pid, 0, "Not a supported controller"); return; }
 
+    p->side = findChar(chars, p->pid == 0x2067 ? SIDE_L : (p->pid == 0x2066 ? SIDE_R : SIDE_PRO));
     std::weak_ptr<Pad> wp = p;
-    p->input.ValueChanged([wp](GattCharacteristic const&, GattValueChangedEventArgs const& a) {
-      auto sp = wp.lock();
-      if (!sp) return;
-      auto v = readBuf(a.CharacteristicValue());
-      Report r{};
-      memcpy(r.data, v.data(), std::min<size_t>(v.size(), 63));
-      std::lock_guard<std::mutex> lk(sp->m);
-      sp->reports.push_back(r);
-      if (sp->reports.size() > 512) sp->reports.pop_front();
-    });
-    p->input.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue::Notify).get();
+    // byte 63 of each queued report tags its source: 0 = common report, 1 = native side report
+    auto hook = [wp](GattCharacteristic const& ch, uint8_t tag) {
+      ch.ValueChanged([wp, tag](GattCharacteristic const&, GattValueChangedEventArgs const& a) {
+        auto sp = wp.lock();
+        if (!sp) return;
+        auto v = readBuf(a.CharacteristicValue());
+        Report r{};
+        memcpy(r.data, v.data(), std::min<size_t>(v.size(), 63));
+        r.data[63] = tag;
+        std::lock_guard<std::mutex> lk(sp->m);
+        sp->reports.push_back(r);
+        if (sp->reports.size() > 1024) sp->reports.pop_front();
+      });
+      ch.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue::Notify).get();
+    };
+    hook(p->input, 0);
+    if (p->side) { try { hook(p->side, 1); } catch (...) {} }
     if (p->reply) {
       try { p->reply.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue::Notify).get(); } catch (...) {}
     }

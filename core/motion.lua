@@ -93,6 +93,18 @@ function M:feed(dt, gyroRaw, accelRaw)
   self.bias = m.scale(f.bias, 1 / DEG)
   self.gyro = m.scale(f.gyro, 1 / DEG)
   self.raw = f.q
+  -- A controller that tracks its own orientation (Joy-Con 2 native reports) wins over our
+  -- fusion. Its reference "up" may differ from ours, so it is aligned to gravity whenever
+  -- the accelerometer is trustworthy (not swinging).
+  if self.extOrient then
+    local e = self.extOrient
+    if a and math.abs(m.len(a) - G) < 0.6 then
+      local upW = m.qrot(e, m.norm(a))
+      local target = m.qfromto(upW, m.UP)
+      self.extAlign = self.extAlign and m.qslerp(self.extAlign, target, math.min(1, dt * 1.5)) or target
+    end
+    self.raw = m.qmul(self.extAlign or m.qid(), e)
+  end
   self.orient = m.qmul(m.qaxis(m.UP, -self.yawOffset), self.raw)
   if a then
     local wa = m.qrot(self.raw, m.scale(f.accel, G)) -- gravity already removed
@@ -101,7 +113,13 @@ function M:feed(dt, gyroRaw, accelRaw)
 
   -- gyro pointer: moved by player-space gyro (yaw around gravity, pitch), like a mouse.
   -- It never "loses" its place when orientation drifts, and pins at the screen edges.
-  if not self.hasPointer then
+  if not self.hasPointer and self.extOrient then
+    -- absolute pointing (like the Wii's IR): angle from the recentred heading
+    local yaw, pitch = m.angles(self.orient)
+    self.pointer.x = m.clamp(0.5 - yaw / (2 * self.pointerFov[1]), 0, 1)
+    self.pointer.y = m.clamp(0.5 - pitch / (2 * self.pointerFov[2]), 0, 1)
+    self.pointer.valid = true
+  elseif not self.hasPointer then
     local pitchRate, yawRate = f:playerSpace()
     local px = self.pointer.x - (yawRate * dt) / (2 * self.pointerFov[1] * DEG)
     local py = self.pointer.y - (pitchRate * dt) / (2 * self.pointerFov[2] * DEG)

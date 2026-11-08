@@ -34,6 +34,7 @@ jobs:
         cd game
         python tools/runlua.py tests/test_core.lua
         python tools/runlua.py tests/test_jc2_log.lua
+        python tools/runlua.py tests/test_jc2_native.lua
 
     - name: Cache LÖVE build
       id: cache

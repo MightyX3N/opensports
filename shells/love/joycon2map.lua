@@ -14,6 +14,15 @@ local function gamepad(v) return { v[1], v[3], -v[2] } end
 
 M.MAP = { [0x2066] = remote, [0x2067] = remote }
 
+-- map a quaternion given in the device's native axes into the game's axes (similarity
+-- transform by the same axis permutation: w stays, the vector part is permuted)
+function M.quat(pid, q)
+  local f = M.MAP[pid] or gamepad
+  local v = f({ q[2], q[3], q[4] })
+  return { q[1], v[1], v[2], v[3] }
+end
+function M.vec(pid, v) return (M.MAP[pid] or gamepad)(v) end
+
 -- raw int16 gyro/accel -> rad/s, m/s² in the game's frame. gyroFull = full-scale rad/s.
 function M.convert(pid, rawG, rawA, gyroFull)
   local f = M.MAP[pid] or gamepad

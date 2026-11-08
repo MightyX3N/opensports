@@ -4,6 +4,8 @@
 local ok, ffi = pcall(require, "ffi")
 local motion = require("core.motion")
 local jmap = require("shells.love.joycon2map")
+local native = require("shells.love.joycon2native")
+local m = require("core.math")
 local B = { available = false, found = {}, status = nil, pads = {} }
 
 local G = 9.80665
@@ -134,6 +136,28 @@ function B.read(c, frameDt)
   local defaults = B.DEFAULTS[c.ble.pid] or B.DEFAULTS[0x2069]
   for i = 0, n - 1 do
     local p = B.buf + i * 64
+    if p[63] == 1 then
+      if B.log and B.log.ctrl == c then
+        local hex = {}
+        for k = 0, 62 do hex[#hex + 1] = string.format("%02x", p[k]) end
+        B.log.lines[#B.log.lines + 1] = string.format("%.4f side %s", love.timer.getTime() - B.log.t0, table.concat(hex))
+      end
+      local d = native.decode(function(k) return p[k] end, c.ble.pid)
+      if d and d.q then
+        local q = jmap.quat(c.ble.pid, d.q)
+        local l = math.sqrt(q[1] ^ 2 + q[2] ^ 2 + q[3] ^ 2 + q[4] ^ 2)
+        if l > 0.9 and l < 1.1 then
+          -- keep sign continuity (q and -q are the same orientation)
+          local prev = c.nativeQ
+          if prev and (prev[1] * q[1] + prev[2] * q[2] + prev[3] * q[3] + prev[4] * q[4]) < 0 then
+            q = { -q[1], -q[2], -q[3], -q[4] }
+          end
+          c.nativeQ = q
+          c.nativeCount = (c.nativeCount or 0) + 1
+        end
+      end
+      goto continue
+    end
     -- Time step per report, done the way SDL's Switch 2 driver does it: the motion
     -- timestamp is normally microseconds (gyro full scale 34.8 rad/s) but some firmware
     -- counts in other units (then the gyro full scale is 40 rad/s). Measure it once
@@ -176,6 +200,7 @@ function B.read(c, frameDt)
       B.log.lines[#B.log.lines + 1] = string.format("%.4f %.5f %s", love.timer.getTime() - B.log.t0, dt, table.concat(hex))
     end
     c.lastRaw = { g = g, a = a }
+    c.extOrient = c.nativeQ -- the controller's own orientation, when its side reports arrive
     c:feed(dt, g, a)
     if i == n - 1 then
       local map = c.profile.buttons
@@ -196,6 +221,7 @@ function B.read(c, frameDt)
         if name then local f = c.capture; c.capture = nil; f("jc:" .. name) end
       end
     end
+    ::continue::
   end
 end
 
