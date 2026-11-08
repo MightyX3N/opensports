@@ -7,7 +7,9 @@ Swing a real controller to bowl, serve, putt, slice and throw, alone or with fri
 
 ## Running the input test
 
-Requires [LÖVE](https://love2d.org) 12 (11.5 also runs it, but without gyro sensors).
+**Windows:** download `OpenSports-win64.zip` from the [dev release](https://github.com/MightyX3N/opensports/releases/tag/dev), unzip it and run `OpenSports.exe`. The release is rebuilt on every push to `main`. The exe isn't signed, so Windows SmartScreen may warn on first run: choose *More info → Run anyway*.
+
+**From source:** requires [LÖVE](https://love2d.org) 12 (11.5 also runs it, but without gyro sensors).
 
 ```sh
 love .
