@@ -32,6 +32,7 @@ Settings="*res://core/settings.gd"
 GameData="*res://core/game_data.gd"
 Snd="*res://core/sound.gd"
 Inputs="*res://core/inputs.gd"
+Preload="*res://core/preload.gd"
 
 [shader_globals]
 

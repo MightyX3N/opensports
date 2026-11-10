@@ -13,41 +13,62 @@ var pin_offset := Vector3.ZERO
 var ball_parts := []
 var error := ""
 
-## build from the disc (await: upscaling textures takes a few frames); null on failure
+## run work on a background thread and wait for it without freezing the screen
+static func in_thread(tree: SceneTree, work: Callable):
+	var th := Thread.new()
+	th.start(work)
+	while th.is_alive():
+		await tree.process_frame
+	return th.wait_to_finish()
+
+## build from the disc: reading, decoding and mesh building happen on a background thread,
+## upscaling on the GPU (a few frames); null on failure
 static func build(tree: SceneTree) -> DiscAlley:
 	var d := DiscAlley.new()
-	var files := GameData.archive("bow_common")
-	if files.is_empty():
+	var data: Dictionary = await in_thread(tree, func():
+		var files := GameData.archive("bow_common")
+		if files.is_empty():
+			return {}
+		var out := {field = Brres.parse(files["/G3D/bwg_field.brres"]), pins = Brres.parse(files["/G3D/bwg_Pin.brres"]),
+			balls = Brres.parse(files["/G3D/bwg_ball.brres"])}
+		for k in out:
+			for t in out[k].textures.values():
+				Brres.decode_texture(t)
+		return out)
+	if data.is_empty():
 		d.error = "no bowling files on the disc"
 		return null
-	var field := Brres.parse(files["/G3D/bwg_field.brres"])
-	var pins := Brres.parse(files["/G3D/bwg_Pin.brres"])
-	var balls := Brres.parse(files["/G3D/bwg_ball.brres"])
+	var field: Dictionary = data.field
+	var pins: Dictionary = data.pins
+	var balls: Dictionary = data.balls
 	var all_tex := []
 	for arch in [field, pins, balls]:
 		all_tex.append_array(arch.textures.values())
 	await Upscale.prepare(tree, all_tex)
+	var parts: Dictionary = await in_thread(tree, func():
+		# the hall is several models; reflection layers first, then the rest in the game's order
+		var first := []
+		var rest := []
+		for name in ["bwg_field", "bwg_field_front", "bwg_field_pin", "lane_alpha"]:
+			if field.models.has(name):
+				for p in WiiModel.build(field, name):
+					if p.mat_name in REFLECT:
+						first.append(p)
+					else:
+						rest.append(p)
+		# one pin out of the 10-pin rack, recentred on its base
+		var pm_name := "bwg_pin_438_10" if pins.models.has("bwg_pin_438_10") else str(pins.models.keys()[0])
+		var pm: Dictionary = pins.models[pm_name]
+		var shape: Dictionary = pm.shapes[0]
+		var bname := "bwg_ball_blue" if balls.models.has("bwg_ball_blue") else str(balls.models.keys()[0])
+		return {hall = first + rest, pin = WiiModel.build(pins, pm_name, {shape = shape.name, local_space = true}),
+			pin_offset = recentre(shape), ball = WiiModel.build(balls, bname)})
 	d.hall = Node3D.new()
 	d.hall.name = "DiscHall"
-	# the hall is several models; reflection layers first, then the rest in the game's order
-	var first := []
-	var rest := []
-	for name in ["bwg_field", "bwg_field_front", "bwg_field_pin", "lane_alpha"]:
-		if field.models.has(name):
-			for p in WiiModel.build(field, name):
-				if p.mat_name in REFLECT:
-					first.append(p)
-				else:
-					rest.append(p)
-	WiiModel.instance(first + rest, d.hall)
-	# one pin out of the 10-pin rack, recentred on its base
-	var pm_name := "bwg_pin_438_10" if pins.models.has("bwg_pin_438_10") else str(pins.models.keys()[0])
-	var pm: Dictionary = pins.models[pm_name]
-	var shape: Dictionary = pm.shapes[0]
-	d.pin_parts = WiiModel.build(pins, pm_name, {shape = shape.name, local_space = true})
-	d.pin_offset = recentre(shape)
-	var bname := "bwg_ball_blue" if balls.models.has("bwg_ball_blue") else str(balls.models.keys()[0])
-	d.ball_parts = WiiModel.build(balls, bname)
+	WiiModel.instance(parts.hall, d.hall)
+	d.pin_parts = parts.pin
+	d.pin_offset = parts.pin_offset
+	d.ball_parts = parts.ball
 	return d
 
 ## where a stored shape sits (so a pin taken out of a rack can be put back on its base)

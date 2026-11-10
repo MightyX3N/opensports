@@ -3,7 +3,7 @@
 class_name BowlingHud
 extends UICanvas
 
-const PAUSE := [["Resume", "resume"], ["Restart", "restart"], ["Settings", "settings"], ["Quit to sport select", "sports"]]
+const PAUSE := [["Resume", "resume"], ["Connect Joy-Con 2", "pair"], ["Restart", "restart"], ["Settings", "settings"], ["Quit to sport select", "sports"]]
 const OVER := [["Play again", "restart"], ["Sport select", "sports"]]
 
 var game: BowlingGame
@@ -19,7 +19,7 @@ func _draw() -> void:
 		var sr := screen_rect()
 		draw_rect(sr, COL.bg)
 		text("Loading the bowling alley…", 0, 330, 28, COL.ink, "center", W)
-		text("Reading your Wii Sports disc" if GameData.available() else "", 0, 372, 16, COL.sub, "center", W)
+		text(Preload.status, 0, 372, 16, COL.sub, "center", W)
 		return
 	var c = g.ctrl
 	var lb := _labels(c)
@@ -36,6 +36,9 @@ func _draw() -> void:
 		text("MOVING" if g.mode == "move" else "TURNING", 40, y + 12, 12, COL.blue)
 		_key_chip(40, y + 32, lb.move, "Move" if g.mode == "move" else "Turn")
 		_key_chip(40, y + 68, lb.toggle, "Switch to turn" if g.mode == "move" else "Switch to move")
+		if lb.has("recentre"):
+			rect(24, y - 44, 220, 36, 18, COL.card)
+			_key_chip(30, y - 41, lb.recentre, "Re-centre aim")
 		var txt := _instruction(lb)
 		var tw := text_width(txt, 18) + 60
 		rect(640 - tw / 2 + 170, 628, tw, 52, 26, COL.blue)
@@ -100,6 +103,7 @@ func _action(a: String) -> void:
 		"resume": game.resume()
 		"restart": game.new_game(game.opts)
 		"settings": game.resume(); app.go("settings")
+		"pair": game.resume(); app.go("pair")
 		"sports": game.resume(); app.root("sports")
 
 func _key_chip(x: float, y: float, key: String, label: String) -> float:
@@ -112,6 +116,9 @@ func _key_chip(x: float, y: float, key: String, label: String) -> float:
 func _labels(c) -> Dictionary:
 	if c.kind == "mouse":
 		return {throw = "Drag down, then flick up", move = "Arrow keys", toggle = "Space", mouse = true}
+	if c.kind == "joycon2" and c.name.contains("Joy-Con"):
+		var left: bool = c.name.contains("(L)")
+		return {throw = "ZL" if left else "ZR", move = "Stick", toggle = "Press stick", recentre = "Up" if left else "X", motion = true}
 	if c.name.contains("Pro Controller"):
 		return {throw = "ZR", move = "Stick / D-pad", toggle = "A"}
 	return {throw = "R2 / RT", move = "Stick / D-pad", toggle = "A"}
@@ -119,6 +126,11 @@ func _labels(c) -> Dictionary:
 func _instruction(lb: Dictionary) -> String:
 	if lb.get("mouse", false):
 		return "Drag the mouse down, then flick it up to throw · sideways at the end = spin"
+	if game.ctrl.level == Inputs.FULL:
+		match game.reader.phase:
+			"wait": return "Hold still…"
+			"ready", "swing": return "Swing back and forward, let go of %s to release" % lb.throw
+		return "Hold the controller upright in front of your chest and hold " + lb.throw
 	return "Hold %s, pull the stick back, then push it forward" % lb.throw
 
 func scorecard(x: float, y: float, big: bool) -> float:

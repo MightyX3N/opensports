@@ -56,6 +56,13 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	L("disc: " + GameData.status)
+	# everything loads while the title screen is up
+	var tp := Time.get_ticks_msec()
+	Preload.start()
+	await shot("01a_title_loading")
+	while Preload.loading:
+		await get_tree().process_frame
+	L("  preloaded in %d ms (real look: %s)" % [Time.get_ticks_msec() - tp, str(Preload.real)])
 	await shot("01_title")
 	await nav("a")
 	check(main.screen == "sports", "title -> sport select")
@@ -70,6 +77,7 @@ func _ready() -> void:
 		await get_tree().process_frame
 	L("  alley ready in %d ms (real look: %s)" % [Time.get_ticks_msec() - t0, str(g.real)])
 	check(not g.loading, "alley loaded")
+	check(Time.get_ticks_msec() - t0 < 1500, "the game starts straight away (everything was preloaded)")
 	await wait(0.5)
 	await shot("04_aim")
 	var frames := 0

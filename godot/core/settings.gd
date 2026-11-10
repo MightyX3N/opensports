@@ -12,6 +12,8 @@ const DEFAULTS := {
 	texture_pack = true,   # use texture packs in packs/textures
 	upscale = "off",       # enlarge the disc's own textures with xBRZ: "off", "2x", "4x"
 	real_look = true,      # use the Wii Sports disc in rom/ when it's there
+	auto_connect = true,   # listen for saved Joy-Con 2 and connect them when they wake up
+	saved = [],            # Joy-Con 2 this computer has connected before: { addr, pid, name }
 }
 const CHOICES := {
 	fullscreen = [false, true],
@@ -22,6 +24,7 @@ const CHOICES := {
 	texture_pack = [true, false],
 	upscale = ["off", "2x", "4x"],
 	real_look = [true, false],
+	auto_connect = [true, false],
 }
 
 signal changed(key: String, value)
@@ -32,7 +35,7 @@ func _ready() -> void:
 	load_file()
 
 func load_file() -> void:
-	data = DEFAULTS.duplicate()
+	data = DEFAULTS.duplicate(true)
 	var cf := ConfigFile.new()
 	if cf.load(FILE) == OK:
 		for k in DEFAULTS:

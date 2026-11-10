@@ -1,2 +1,5 @@
 *.love
 build/
+/rom/
+/packs/
+/build/

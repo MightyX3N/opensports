@@ -90,22 +90,20 @@ func _ready() -> void:
 	loading = false
 
 func _build() -> void:
-	var d = null
-	var t0 := Time.get_ticks_msec()
-	if GameData.available():
-		d = await DiscAlley.build(get_tree())
-		Log.write("bowling: real alley %s in %d ms (texture pack images: %d, upscale %s)" % ["built" if d != null else "failed",
-			Time.get_ticks_msec() - t0, TexturePacks.count, Settings.get_value("upscale")])
-	if d != null:
-		alley = d
-		real = true
+	# everything was loaded while the menus were up (core/preload.gd)
+	if Preload.loading or Preload.alley == null:
+		if not Preload.loading:
+			Preload.start()
+		await Preload.finished
+	alley = Preload.alley
+	real = Preload.real
+	if real:
 		RenderingServer.global_shader_parameter_set("os_fog", Vector2(60, 200))
 		RenderingServer.global_shader_parameter_set("os_fog_col", Vector3(0.80, 0.74, 0.62))
 		RenderingServer.global_shader_parameter_set("os_sky", Vector3(0.66, 0.64, 0.62))
 		RenderingServer.global_shader_parameter_set("os_ground", Vector3(0.46, 0.42, 0.38))
 		RenderingServer.global_shader_parameter_set("os_sun_col", Vector3(0.42, 0.40, 0.36))
 	else:
-		alley = OwnAlley.build()
 		OwnAlley.apply_light()
 	add_child(alley.hall)
 	for i in 10:
@@ -129,6 +127,11 @@ func _build() -> void:
 	add_child(bowler)
 	bowler_shadow = _shadow()
 	_build_aim()
+
+## hand the shared hall back before this game is freed (it is kept for the next game)
+func release_hall() -> void:
+	if alley != null and alley.hall != null and alley.hall.get_parent() == self:
+		remove_child(alley.hall)
 
 func _shadow() -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -361,7 +364,10 @@ func _process(dt: float) -> void:
 		if ctrl.pressed.get("plus", false):
 			open_pause()
 		elif phase == "aim":
-			if ctrl.pressed.get("sclick", false) or ctrl.pressed.get("a", false):
+			if ctrl.pressed.get("recentre", false) and ctrl.kind == "joycon2":
+				ctrl.recentre()
+				toast("Aim re-centred")
+			if ctrl.pressed.get("sclick", false) or (ctrl.pressed.get("a", false) and reader.phase == "idle"):
 				mode = "turn" if mode == "move" else "move"
 				Snd.ui("toggle")
 			if reader.phase == "idle" or reader.phase == "ready":
@@ -369,6 +375,7 @@ func _process(dt: float) -> void:
 			var ev := reader.update()
 			if not ev.is_empty():
 				match ev.type:
+					"ready": ctrl.rumble(0.05, 0.3)
 					"swing": walk = 0.001
 					"throw": release_ball(ev)
 					"cancel":

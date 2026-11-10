@@ -1,0 +1,9 @@
+#!/usr/bin/env python
+# Builds bin/osble.dll (the Godot extension) on Windows with MSVC:
+#   scons platform=windows target=template_release disable_exceptions=no
+import os
+env = SConscript("godot-cpp/SConstruct")
+env.Append(CXXFLAGS=["/EHsc", "/bigobj", "/permissive-"])
+env.Append(LIBS=["windowsapp"])
+lib = env.SharedLibrary("bin/osble{}".format(env["SHLIBSUFFIX"]), ["src/osble_godot.cpp"])
+Default(lib)

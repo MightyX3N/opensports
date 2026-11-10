@@ -12,6 +12,7 @@ var _toast_ui: UICanvas
 
 func _ready() -> void:
 	get_window().title = "Open Sports"
+	Inputs.connected.connect(func(c): toast(c.name + " connected"))
 	var layer := CanvasLayer.new()
 	layer.layer = 10
 	add_child(layer)
@@ -50,6 +51,10 @@ func _switch(name: String) -> void:
 		game.set_process(true)
 		game.camera.make_current()
 	menus.screen = name
+	if name == "pair":
+		JoyCon2.scan(true)
+	elif JoyCon2.scanning and not JoyCon2.background:
+		JoyCon2.scan(false)
 
 func go(name: String) -> void:
 	if name == screen:
@@ -71,12 +76,14 @@ func root(name: String) -> void:
 		stack.append("sports")
 	if game != null and name != "bowling":
 		game.silence()
+		game.release_hall()
 		game.queue_free()
 		game = null
 	_switch(name)
 
 func start_bowling(opts: Dictionary) -> void:
 	if game != null:
+		game.release_hall()
 		game.queue_free()
 	game = BowlingGame.new()
 	game.opts = opts
@@ -84,6 +91,10 @@ func start_bowling(opts: Dictionary) -> void:
 	hud.game = game
 	stack = ["title", "sports", "modes"]
 	_switch("bowling")
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		JoyCon2.shutdown()
 
 func apply_setting(k: String, v) -> void:
 	match k:
@@ -98,12 +109,20 @@ func textures_changed() -> void:
 	WiiModel.clear_textures()
 	Upscale.clear()
 	if game != null:
+		game.release_hall()
 		game.queue_free()
 		game = null
+		stack.erase("bowling")
+	Preload.restart()
 
 func _process(dt: float) -> void:
 	if toast_t > 0:
 		toast_t -= dt
+	# keep listening for saved Joy-Cons in the background (they connect when SYNC is pressed)
+	if JoyCon2.available and screen != "pair":
+		var want: bool = Settings.get_value("auto_connect") and not Settings.get_value("saved").is_empty()
+		if want != JoyCon2.background:
+			JoyCon2.listen(want)
 	var nav := Inputs.take_nav()
 	if nav.is_empty():
 		pass

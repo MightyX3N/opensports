@@ -34,6 +34,7 @@ func _draw() -> void:
 		"settings": _settings()
 		"wiidisc": _wiidisc()
 		"controllers": _controllers()
+		"pair": _pair()
 
 func back_button(label := "Back") -> void:
 	var r := back_button_shape(80, 640, label)
@@ -151,6 +152,12 @@ func _title() -> void:
 	item(Rect2(0, 0, W, H), "start", func(): app.go("sports"), {no_ring = true, default = true})
 	_chips(40, 670, false)
 	text("v0.2 · GPL-3.0", 1000, 676, 13, COL.sub, "right", 240)
+	# what is loading in the background (the disc, the alley)
+	var st: String = Preload.status
+	if st != "":
+		var sw := text_width(st, 14) + 40
+		rect(640 - sw / 2, 484, sw, 32, 16, Color(1, 1, 1, 0.85))
+		text(st, 640 - sw / 2, 491, 14, COL.blue_dark if not Preload.loading else COL.sub, "center", sw)
 
 # ------------------------------------------------------------------ 2 sport select
 func _sports() -> void:
@@ -272,9 +279,51 @@ func _controllers() -> void:
 		var st := "In play" if c == Inputs.current else "Ready"
 		text(st, 500, y + 19, 13, COL.blue_dark if c == Inputs.current else COL.green_ink, "right", 120)
 		item(Rect2(80, y, 560, 54), "ctrl_%d" % i, func(): Inputs.current = c, {r = 18, default = c == Inputs.current})
-	text("Plug in a gamepad or connect one over Bluetooth: it shows up here. Joy-Con 2 and motion controls come next.",
+	text("Plug in a gamepad, or connect Joy-Con 2 here. A controller that sends motion bowls with full motion.",
 		700, 140, 15, COL.sub, "left", 480)
+	pill("Connect Joy-Con 2", 700, 220, "primary", func(): app.go("pair"), 300)
 	back_button()
+	draw_focus()
+
+# ------------------------------------------------------------------ Joy-Con 2 pairing
+func _pair() -> void:
+	begin_items("pair")
+	header("SETUP · BLUETOOTH", "Connect Joy-Con 2")
+	rect(80, 130, 540, 480, 32, COL.card)
+	text("Press the SYNC button", 110, 160, 26)
+	text("It's the small round button on the flat rail side of each Joy-Con 2 (or next to the USB port on a Pro Controller 2). The lights will run back and forth.",
+		110, 200, 16, COL.sub, "left", 480)
+	rect(150, 300, 400, 120, 22, COL.soft)
+	rect(200, 340, 300, 40, 20, COL.red)
+	rect(200, 340, 300, 12, 6, Color(0.949, 0.416, 0.384))
+	circle(282, 360, 8, COL.ink)
+	for i in 4:
+		circle(380 + i * 22, 360, 6, COL.green if i == 1 else COL.line)
+	arc(282, 360, 18, 0, TAU, COL.blue, 3)
+	text("SYNC", 252, 392, 13, COL.blue_dark, "center", 60)
+	text("Windows doesn't list Joy-Con 2 under Bluetooth settings: the game connects to them directly. After the first time it's saved: just press SYNC on it on any screen.",
+		110, 446, 14, COL.sub, "left", 480)
+	text("CONTROLLERS NEARBY", 652, 130, 16, COL.sub)
+	if not JoyCon2.available:
+		rect(652, 160, 548, 90, 20, COL.warn_soft)
+		text(JoyCon2.reason if JoyCon2.reason != "" else "Bluetooth isn't available", 676, 180, 17, COL.warn, "left", 500)
+	else:
+		if JoyCon2.found.is_empty():
+			rect(652, 160, 548, 64, 20, COL.card)
+			text(JoyCon2.status if JoyCon2.status != "" else "Searching…", 676, 182, 15, COL.sub, "left", 500)
+		for i in JoyCon2.found.size():
+			var e: Dictionary = JoyCon2.found[i]
+			var y := 160 + i * 76
+			rect(652, y, 548, 64, 20, COL.card)
+			text(e.name, 676, y + 12, 17)
+			var st: String = {found = "Press A to connect", connecting = e.status_text if e.status_text != "" else "Connecting…",
+				connected = "Connected", failed = e.status_text if e.status_text != "" else "Failed: press SYNC and try again",
+				lost = "Disconnected"}.get(e.state, e.state)
+			text(st, 676, y + 34, 14, COL.green_ink if e.state == "connected" else (COL.warn if e.state == "failed" else COL.sub), "left", 380)
+			text("%d dBm" % e.rssi, 1050, y + 22, 14, COL.sub, "right", 130)
+			item(Rect2(652, y, 548, 64), "pad_%d" % i, JoyCon2.connect_entry.bind(e), {r = 20, default = i == 0})
+	back_button("Done")
+	pill("Search again", 1176 - 180, 640, "", func(): JoyCon2.scan(true), 180)
 	draw_focus()
 
 # ------------------------------------------------------------------ settings
@@ -287,6 +336,7 @@ const ROWS := [
 	{key = "swing", label = "Swing strength", sub = "How hard you need to swing for the fastest ball"},
 	{key = "aim_line", label = "Aim line", sub = "The dotted guide on the lane"},
 	{section = "CONTROLLERS"},
+	{key = "auto_connect", label = "Connect saved Joy-Cons by themselves", sub = "Press SYNC on a saved Joy-Con on any screen"},
 	{action = "controllers", label = "Controllers", sub = "Connected controllers and which one is in play"},
 	{section = "YOUR WII SPORTS DISC"},
 	{action = "wiidisc", label = "Wii Sports disc and textures", sub = "The real Wii Sports look, texture packs and upscaling"},
