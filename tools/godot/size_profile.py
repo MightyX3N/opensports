@@ -10,7 +10,7 @@ optimize = "size"
 debug_symbols = "no"
 deprecated = "no"
 vulkan = "no"
-d3d12 = "no"
+d3d12 = "no"   # Windows: also needs d3d12=no on the command line (platform defaults win over this file)
 metal = "no"
 openxr = "no"
 disable_xr = "yes"

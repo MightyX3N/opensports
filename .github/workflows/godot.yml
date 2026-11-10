@@ -54,7 +54,8 @@ jobs:
         python3 -m pip install --quiet scons
         git clone --depth 1 --branch $GODOT_VERSION-stable https://github.com/godotengine/godot godot-src
         cd godot-src
-        scons platform=windows target=template_release arch=x86_64 use_mingw=yes profile=../tools/godot/size_profile.py -j$(nproc)
+        # (platform defaults beat the profile file, so the drivers are switched off here)
+        scons platform=windows target=template_release arch=x86_64 use_mingw=yes d3d12=no vulkan=no accesskit=no profile=../tools/godot/size_profile.py -j$(nproc)
         mkdir -p ../template
         cp bin/godot.windows.template_release.x86_64.exe ../template/
         ls -la ../template
