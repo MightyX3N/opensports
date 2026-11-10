@@ -8,7 +8,7 @@
 production = "yes"
 optimize = "size"
 debug_symbols = "no"
-deprecated = "no"
+deprecated = "yes"  # GDExtensions built against an older Godot (osble.dll, godot-cpp 4.5) need the older interface functions
 vulkan = "no"
 d3d12 = "no"   # Windows: also needs d3d12=no on the command line (platform defaults win over this file)
 metal = "no"
