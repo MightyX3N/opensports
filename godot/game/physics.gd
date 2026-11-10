@@ -5,7 +5,7 @@
 class_name Physics
 extends RefCounted
 
-class Plane:
+class StaticPlane:
 	var n: Vector3
 	var d: float
 	var mu: float
@@ -39,7 +39,7 @@ class Body:
 class Contact:
 	var a: Body                # null for a plane contact
 	var b: Body
-	var plane: Plane
+	var plane: StaticPlane
 	var n: Vector3
 	var p: Vector3
 	var depth: float
@@ -59,7 +59,7 @@ class Contact:
 	var j2 := 0.0
 
 var bodies: Array[Body] = []
-var planes: Array[Plane] = []
+var planes: Array[StaticPlane] = []
 var gravity := -9.81
 var iterations := 8
 var slop := 0.002
@@ -68,15 +68,15 @@ var sleep_lin := 0.04
 var sleep_ang := 0.25
 var sleep_time := 0.35
 var t := 0.0
-var on_contact: Callable # (a: Body or Plane, b: Body, impulse, contact)
+var on_contact: Callable # (a: Body or StaticPlane, b: Body, impulse, contact)
 
 func _init(iters := 8) -> void:
 	iterations = iters
 
 ## plane: normal n (out of the solid), offset d (n.x = d on the surface); bounds limits it
 ## to a region (xmin, xmax, zmin, zmax); ymax: it only exists below that height
-func add_plane(n: Vector3, d: float, mu: float, e: float, name := "", bounds = null, ymax = null) -> Plane:
-	var p := Plane.new()
+func add_plane(n: Vector3, d: float, mu: float, e: float, name := "", bounds = null, ymax = null) -> StaticPlane:
+	var p := StaticPlane.new()
 	p.n = n.normalized(); p.d = d; p.mu = mu; p.e = e; p.name = name; p.bounds = bounds; p.ymax = ymax
 	planes.append(p)
 	return p
@@ -151,7 +151,7 @@ static func _tangents(n: Vector3) -> Array:
 		t1 = Vector3(0, n.z, -n.y).normalized()
 	return [t1, n.cross(t1)]
 
-static func _in_bounds(p: Plane, c: Vector3) -> bool:
+static func _in_bounds(p: StaticPlane, c: Vector3) -> bool:
 	if p.ymax != null and c.y > p.ymax:
 		return false
 	if p.bounds == null:

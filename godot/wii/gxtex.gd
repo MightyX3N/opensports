@@ -22,8 +22,8 @@ const BLOCK := {0: [8, 8], 1: [8, 4], 2: [8, 4], 3: [4, 4], 4: [4, 4], 5: [4, 4]
 ## size in bytes of one level (whole 32-byte blocks)
 static func size(fmt: int, w: int, h: int) -> int:
 	var b: Array = BLOCK.get(fmt, [4, 4])
-	var nx := (w + b[0] - 1) / b[0]
-	var ny := (h + b[1] - 1) / b[1]
+	var nx: int = (w + b[0] - 1) / b[0]
+	var ny: int = (h + b[1] - 1) / b[1]
 	return nx * ny * (64 if fmt == RGBA8 else 32)
 
 static func x5(v: int) -> int: return (v << 3) | (v >> 2)

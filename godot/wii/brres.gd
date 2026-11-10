@@ -443,7 +443,7 @@ static func _parse_material(s: PackedByteArray, o: int, version: int) -> Diction
 	var ac: int = r.bp.get(0xF3, 0)
 	m.alpha_test = {ref0 = _bit(ac, 0, 255), ref1 = _bit(ac, 8, 255), comp0 = _bit(ac, 16, 7), comp1 = _bit(ac, 19, 7), op = _bit(ac, 22, 3)}
 	var z: int = r.bp.get(0x40, 0)
-	m.zmode = {test = _bit(z, 0, 1) == 1, func = _bit(z, 1, 7), write = _bit(z, 4, 1) == 1}
+	m.zmode = {test = _bit(z, 0, 1) == 1, fn = _bit(z, 1, 7), write = _bit(z, 4, 1) == 1}
 	# TEV colour registers (prev, c0, c1, c2) and constant colours (k0..k3)
 	var reg_colors := []
 	var konst := []
@@ -461,7 +461,7 @@ static func _parse_material(s: PackedByteArray, o: int, version: int) -> Diction
 	var tev := []
 	for i in m.num_tevs:
 		var order: int = r.bp.get(0x28 + i / 2, 0)
-		var odd := i % 2 == 1
+		var odd: bool = i % 2 == 1
 		var st := {tex_map = _bit(order, 12 if odd else 0, 7), tex_coord = _bit(order, 15 if odd else 3, 7),
 			tex_on = _bit(order, 18 if odd else 6, 1) == 1, channel = _bit(order, 19 if odd else 7, 7)}
 		var c: int = r.bp.get(0xC0 + i * 2, 0)

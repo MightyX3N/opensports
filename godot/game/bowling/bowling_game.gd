@@ -5,7 +5,6 @@
 class_name BowlingGame
 extends Node3D
 
-const S := BowlingSetup
 const START_Z := 2.3       # where the bowler stands on the approach
 const RELEASE_Z := 0.45
 const ROBOT_SCALE := 1.45 / 2.19
@@ -92,8 +91,11 @@ func _ready() -> void:
 
 func _build() -> void:
 	var d = null
+	var t0 := Time.get_ticks_msec()
 	if GameData.available():
 		d = await DiscAlley.build(get_tree())
+		Log.write("bowling: real alley %s in %d ms (texture pack images: %d, upscale %s)" % ["built" if d != null else "failed",
+			Time.get_ticks_msec() - t0, TexturePacks.count, Settings.get_value("upscale")])
 	if d != null:
 		alley = d
 		real = true
@@ -145,7 +147,7 @@ func _build_aim() -> void:
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.albedo_color = Color(1, 1, 1, 0.8)
-	m.no_depth_test = false
+	m.render_priority = 10 # over the lane's see-through polish
 	dot.material = m
 	for i in 16:
 		var mi := MeshInstance3D.new()
@@ -199,7 +201,7 @@ func release_ball(ev: Dictionary) -> void:
 	var hand := x + 0.14 # right hand
 	var a: float = angle + ev.get("aim", 0.0)
 	standing_before = sim.standing_count()
-	sim.throw({x = clampf(hand, -S.HALF_WIDTH + 0.12, S.HALF_WIDTH - 0.12), angle = a, speed = speed,
+	sim.throw({x = clampf(hand, -BowlingSetup.HALF_WIDTH + 0.12, BowlingSetup.HALF_WIDTH - 0.12), angle = a, speed = speed,
 		hook = ev.get("hook", 0.0) * tun.max_hook})
 	phase = "rolling"
 	t = 0.0
@@ -481,7 +483,7 @@ func _bowler_update(dt: float) -> void:
 
 func _pin_transform(b: Physics.Body) -> Transform3D:
 	var up := b.q * Vector3.UP
-	var base := b.pos - up * S.PIN_COM
+	var base := b.pos - up * BowlingSetup.PIN_COM
 	return Transform3D(Basis(b.q), base)
 
 func _place() -> void:
@@ -522,17 +524,19 @@ func _place() -> void:
 		ball_mirror.visible = show_ball and on_lane.call(bpos) and phase != "aim"
 		if ball_mirror.visible:
 			ball_mirror.transform = mirror * Transform3D(Basis(bq), bpos)
+	# the camera flies past the bowler after the throw: don't fly through its head
+	bowler.visible = phase == "aim" or (cam_pos - (bowler.position + Vector3(0, 1.0, 0))).length() > 0.9
 	bowler_shadow.transform = Transform3D(Basis.from_scale(Vector3(0.34, 1, 0.30)), Vector3(x, 0.002, bz))
 	# dotted throw line with an arrow head on the lane, like the original's guide
 	var show_aim: bool = phase == "aim" and reader.phase != "swing" and reader.phase != "back" and walk == 0 and Settings.get_value("aim_line")
-	var x0 := clampf(x + 0.14, -S.HALF_WIDTH + 0.12, S.HALF_WIDTH - 0.12)
+	var x0 := clampf(x + 0.14, -BowlingSetup.HALF_WIDTH + 0.12, BowlingSetup.HALF_WIDTH - 0.12)
 	var dir := Vector3(-sin(angle), 0, -cos(angle))
 	var pulse := 0.6 + 0.4 * sin(Time.get_ticks_msec() / 1000.0 * 5)
 	for i in aim_dots.size():
 		var dist := 2.0 + i * 0.6
 		var p := Vector3(x0 + dir.x * dist, 0.004, dir.z * dist)
 		var dot: MeshInstance3D = aim_dots[i]
-		dot.visible = show_aim and absf(p.x) < S.HALF_WIDTH - 0.02
+		dot.visible = show_aim and absf(p.x) < BowlingSetup.HALF_WIDTH - 0.02
 		dot.position = p
 		dot.transparency = 1.0 - pulse
 	var tip := 2.0 + 16 * 0.6

@@ -306,7 +306,7 @@ static func value_label(k: String, v) -> String:
 		"quality": return "Smooth" if v == "high" else "Faster"
 		"volume": return {high = "Loud", medium = "Medium", low = "Quiet", off = "Off"}.get(v, str(v))
 		"swing": return {light = "Light", normal = "Normal", strong = "Strong"}.get(v, str(v))
-		"upscale": return {off = "Off", "2x": "2×", "4x": "4×"}.get(v, str(v))
+		"upscale": return {"off": "Off", "2x": "2×", "4x": "4×"}.get(v, str(v))
 	if v is bool:
 		return "On" if v else "Off"
 	return str(v)

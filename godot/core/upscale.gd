@@ -49,7 +49,8 @@ static func prepare(tree: SceneTree, textures: Array) -> void:
 		m.set_shader_parameter("OutputSize", Vector2(vp.size))
 		rect.material = m
 		vp.add_child(rect)
-		tree.root.add_child(vp)
+		tree.root.add_child.call_deferred(vp)
+		await tree.process_frame
 		await RenderingServer.frame_post_draw
 		var out := vp.get_texture().get_image()
 		vp.queue_free()

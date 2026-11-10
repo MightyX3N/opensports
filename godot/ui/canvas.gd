@@ -27,7 +27,7 @@ var _screen := ""
 
 static func font(weight: String) -> Font:
 	if not _fonts.has(weight):
-		var path := {bold = "res://assets/fonts/Nunito-Bold.ttf", extra = "res://assets/fonts/Nunito-ExtraBold.ttf",
+		var path: String = {bold = "res://assets/fonts/Nunito-Bold.ttf", extra = "res://assets/fonts/Nunito-ExtraBold.ttf",
 			black = "res://assets/fonts/Nunito-Black.ttf"}[weight]
 		var f: Font = load(path)
 		_fonts[weight] = f if f != null else ThemeDB.fallback_font
@@ -90,7 +90,7 @@ func text(s: String, x: float, y: float, size: float, color = null, align := "",
 	if align == "":
 		draw_string(f, Vector2(x, y + asc), s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, color)
 		return
-	var ha := {left = HORIZONTAL_ALIGNMENT_LEFT, center = HORIZONTAL_ALIGNMENT_CENTER, right = HORIZONTAL_ALIGNMENT_RIGHT}[align]
+	var ha: HorizontalAlignment = {left = HORIZONTAL_ALIGNMENT_LEFT, center = HORIZONTAL_ALIGNMENT_CENTER, right = HORIZONTAL_ALIGNMENT_RIGHT}[align]
 	if f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x <= w:
 		draw_string(f, Vector2(x, y + asc), s, ha, w, fs, color)
 	else:

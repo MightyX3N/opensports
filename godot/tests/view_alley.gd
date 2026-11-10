@@ -7,6 +7,9 @@ func _ready() -> void:
 	if out == "":
 		out = "/tmp"
 	print("disc: ", GameData.status)
+	Settings.set_value("texture_pack", OS.get_environment("PACK") == "1")
+	Settings.set_value("upscale", OS.get_environment("UPSCALE") if OS.get_environment("UPSCALE") != "" else "off")
+	print("texture pack images: ", TexturePacks.index().size(), " (pack ", Settings.get_value("texture_pack"), ", upscale ", Settings.get_value("upscale"), ")")
 	var t0 := Time.get_ticks_msec()
 	var d: DiscAlley = await DiscAlley.build(get_tree())
 	if d == null:

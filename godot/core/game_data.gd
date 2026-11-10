@@ -31,6 +31,7 @@ func scan() -> void:
 		elif ext in ["rvz", "wia", "gcz", "ciso", "nkit"]:
 			status = "%s isn't supported yet: use a .wbfs or .iso" % p.get_file()
 	if found.is_empty():
+		Log.write("disc: no image in " + Paths.rom_dir())
 		if status == "":
 			status = "No disc in the rom folder"
 		return
@@ -38,12 +39,14 @@ func scan() -> void:
 		var d := WiiDisc.open(p)
 		if not d.ok():
 			status = "%s: %s" % [p.get_file(), d.error if d.error != "" else "unreadable"]
+			Log.write("disc: " + status)
 			continue
 		if not d.game_id.substr(0, 3) in GAME_IDS:
 			status = "%s is %s, not Wii Sports" % [p.get_file(), d.title]
 			continue
 		disc = d
 		status = "%s (%s)" % [d.title, d.game_id]
+		Log.write("disc: %s, %d files, from %s" % [status, d.files.size(), p])
 		return
 
 func available() -> bool:

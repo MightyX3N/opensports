@@ -41,127 +41,127 @@ vec4 xbrz(vec2 vTexCoord)
   vec2 pos = fract(vTexCoord * SourceSize) - vec2(0.5, 0.5);
   vec2 coord = vTexCoord - pos * inv;
 
-  vec4 A = P(coord, inv, -1., -1.);
-  vec4 B = P(coord, inv,  0., -1.);
-  vec4 C = P(coord, inv,  1., -1.);
-  vec4 D = P(coord, inv, -1.,  0.);
-  vec4 E = P(coord, inv,  0.,  0.);
-  vec4 F = P(coord, inv,  1.,  0.);
-  vec4 G = P(coord, inv, -1.,  1.);
-  vec4 H = P(coord, inv,  0.,  1.);
-  vec4 I = P(coord, inv,  1.,  1.);
+  vec4 pA = P(coord, inv, -1., -1.);
+  vec4 pB = P(coord, inv,  0., -1.);
+  vec4 pC = P(coord, inv,  1., -1.);
+  vec4 pD = P(coord, inv, -1.,  0.);
+  vec4 pE = P(coord, inv,  0.,  0.);
+  vec4 pF = P(coord, inv,  1.,  0.);
+  vec4 pG = P(coord, inv, -1.,  1.);
+  vec4 pH = P(coord, inv,  0.,  1.);
+  vec4 pI = P(coord, inv,  1.,  1.);
 
   ivec4 blendResult = ivec4(0, 0, 0, 0);
 
-  if (!(((E == F) && (H == I)) || ((E == H) && (F == I))))
+  if (!(((pE == pF) && (pH == pI)) || ((pE == pH) && (pF == pI))))
   {
-    float dist_H_F = Dist(G, E) + Dist(E, C) + Dist(P(coord, inv, 0., 2.), I) + Dist(I, P(coord, inv, 2., 0.)) + (4.0 * Dist(H, F));
-    float dist_E_I = Dist(D, H) + Dist(H, P(coord, inv, 1., 2.)) + Dist(B, F) + Dist(F, P(coord, inv, 2., 1.)) + (4.0 * Dist(E, I));
+    float dist_H_F = Dist(pG, pE) + Dist(pE, pC) + Dist(P(coord, inv, 0., 2.), pI) + Dist(pI, P(coord, inv, 2., 0.)) + (4.0 * Dist(pH, pF));
+    float dist_E_I = Dist(pD, pH) + Dist(pH, P(coord, inv, 1., 2.)) + Dist(pB, pF) + Dist(pF, P(coord, inv, 2., 1.)) + (4.0 * Dist(pE, pI));
     bool dominantGradient = (3.6 * dist_H_F) < dist_E_I;
-    blendResult.z = ((dist_H_F < dist_E_I) && (E != F) && (E != H)) ? ((dominantGradient) ? 2 : 1) : 0;
+    blendResult.z = ((dist_H_F < dist_E_I) && (pE != pF) && (pE != pH)) ? ((dominantGradient) ? 2 : 1) : 0;
   }
-  if (!(((D == E) && (G == H)) || ((D == G) && (E == H))))
+  if (!(((pD == pE) && (pG == pH)) || ((pD == pG) && (pE == pH))))
   {
-    float dist_G_E = Dist(P(coord, inv, -2., 1.), D) + Dist(D, B) + Dist(P(coord, inv, -1., 2.), H) + Dist(H, F) + (4.0 * Dist(G, E));
-    float dist_D_H = Dist(P(coord, inv, -2., 0.), G) + Dist(G, P(coord, inv, 0., 2.)) + Dist(A, E) + Dist(E, I) + (4.0 * Dist(D, H));
+    float dist_G_E = Dist(P(coord, inv, -2., 1.), pD) + Dist(pD, pB) + Dist(P(coord, inv, -1., 2.), pH) + Dist(pH, pF) + (4.0 * Dist(pG, pE));
+    float dist_D_H = Dist(P(coord, inv, -2., 0.), pG) + Dist(pG, P(coord, inv, 0., 2.)) + Dist(pA, pE) + Dist(pE, pI) + (4.0 * Dist(pD, pH));
     bool dominantGradient = (3.6 * dist_D_H) < dist_G_E;
-    blendResult.w = ((dist_G_E > dist_D_H) && (E != D) && (E != H)) ? ((dominantGradient) ? 2 : 1) : 0;
+    blendResult.w = ((dist_G_E > dist_D_H) && (pE != pD) && (pE != pH)) ? ((dominantGradient) ? 2 : 1) : 0;
   }
-  if (!(((B == C) && (E == F)) || ((B == E) && (C == F))))
+  if (!(((pB == pC) && (pE == pF)) || ((pB == pE) && (pC == pF))))
   {
-    float dist_E_C = Dist(D, B) + Dist(B, P(coord, inv, 1., -2.)) + Dist(H, F) + Dist(F, P(coord, inv, 2., -1.)) + (4.0 * Dist(E, C));
-    float dist_B_F = Dist(A, E) + Dist(E, I) + Dist(P(coord, inv, 0., -2.), C) + Dist(C, P(coord, inv, 2., 0.)) + (4.0 * Dist(B, F));
+    float dist_E_C = Dist(pD, pB) + Dist(pB, P(coord, inv, 1., -2.)) + Dist(pH, pF) + Dist(pF, P(coord, inv, 2., -1.)) + (4.0 * Dist(pE, pC));
+    float dist_B_F = Dist(pA, pE) + Dist(pE, pI) + Dist(P(coord, inv, 0., -2.), pC) + Dist(pC, P(coord, inv, 2., 0.)) + (4.0 * Dist(pB, pF));
     bool dominantGradient = (3.6 * dist_B_F) < dist_E_C;
-    blendResult.y = ((dist_E_C > dist_B_F) && (E != B) && (E != F)) ? ((dominantGradient) ? 2 : 1) : 0;
+    blendResult.y = ((dist_E_C > dist_B_F) && (pE != pB) && (pE != pF)) ? ((dominantGradient) ? 2 : 1) : 0;
   }
-  if (!(((A == B) && (D == E)) || ((A == D) && (B == E))))
+  if (!(((pA == pB) && (pD == pE)) || ((pA == pD) && (pB == pE))))
   {
-    float dist_D_B = Dist(P(coord, inv, -2., 0.), A) + Dist(A, P(coord, inv, 0., -2.)) + Dist(G, E) + Dist(E, C) + (4.0 * Dist(D, B));
-    float dist_A_E = Dist(P(coord, inv, -2., -1.), D) + Dist(D, H) + Dist(P(coord, inv, -1., -2.), B) + Dist(B, F) + (4.0 * Dist(A, E));
+    float dist_D_B = Dist(P(coord, inv, -2., 0.), pA) + Dist(pA, P(coord, inv, 0., -2.)) + Dist(pG, pE) + Dist(pE, pC) + (4.0 * Dist(pD, pB));
+    float dist_A_E = Dist(P(coord, inv, -2., -1.), pD) + Dist(pD, pH) + Dist(P(coord, inv, -1., -2.), pB) + Dist(pB, pF) + (4.0 * Dist(pA, pE));
     bool dominantGradient = (3.6 * dist_D_B) < dist_A_E;
-    blendResult.x = ((dist_D_B < dist_A_E) && (E != D) && (E != B)) ? ((dominantGradient) ? 2 : 1) : 0;
+    blendResult.x = ((dist_D_B < dist_A_E) && (pE != pD) && (pE != pB)) ? ((dominantGradient) ? 2 : 1) : 0;
   }
 
-  vec4 res = E;
+  vec4 res = pE;
 
   if (blendResult.z != 0)
   {
-    float dist_F_G = Dist(F, G);
-    float dist_H_C = Dist(H, C);
+    float dist_F_G = Dist(pF, pG);
+    float dist_H_C = Dist(pH, pC);
     bool doLineBlend = (blendResult.z == 2 ||
-      !((blendResult.y != 0 && !IsPixEqual(E, G)) || (blendResult.w != 0 && !IsPixEqual(E, C)) ||
-        (IsPixEqual(G, H) && IsPixEqual(H, I) && IsPixEqual(I, F) && IsPixEqual(F, C) && !IsPixEqual(E, I))));
+      !((blendResult.y != 0 && !IsPixEqual(pE, pG)) || (blendResult.w != 0 && !IsPixEqual(pE, pC)) ||
+        (IsPixEqual(pG, pH) && IsPixEqual(pH, pI) && IsPixEqual(pI, pF) && IsPixEqual(pF, pC) && !IsPixEqual(pE, pI))));
     vec2 origin = vec2(0.0, 1.0 / sqrt(2.0));
     vec2 direction = vec2(1.0, -1.0);
     if (doLineBlend)
     {
-      bool haveShallowLine = (2.2 * dist_F_G <= dist_H_C) && (E != G) && (D != G);
-      bool haveSteepLine = (2.2 * dist_H_C <= dist_F_G) && (E != C) && (B != C);
+      bool haveShallowLine = (2.2 * dist_F_G <= dist_H_C) && (pE != pG) && (pD != pG);
+      bool haveSteepLine = (2.2 * dist_H_C <= dist_F_G) && (pE != pC) && (pB != pC);
       origin = haveShallowLine ? vec2(0.0, 0.25) : vec2(0.0, 0.5);
       direction.x += haveShallowLine ? 1.0 : 0.0;
       direction.y -= haveSteepLine ? 1.0 : 0.0;
     }
-    vec4 blendPix = mix(H, F, step(Dist(E, F), Dist(E, H)));
+    vec4 blendPix = mix(pH, pF, step(Dist(pE, pF), Dist(pE, pH)));
     res = mix(res, blendPix, get_left_ratio(pos, origin, direction, scale));
   }
   if (blendResult.w != 0)
   {
-    float dist_H_A = Dist(H, A);
-    float dist_D_I = Dist(D, I);
+    float dist_H_A = Dist(pH, pA);
+    float dist_D_I = Dist(pD, pI);
     bool doLineBlend = (blendResult.w == 2 ||
-      !((blendResult.z != 0 && !IsPixEqual(E, A)) || (blendResult.x != 0 && !IsPixEqual(E, I)) ||
-        (IsPixEqual(A, D) && IsPixEqual(D, G) && IsPixEqual(G, H) && IsPixEqual(H, I) && !IsPixEqual(E, G))));
+      !((blendResult.z != 0 && !IsPixEqual(pE, pA)) || (blendResult.x != 0 && !IsPixEqual(pE, pI)) ||
+        (IsPixEqual(pA, pD) && IsPixEqual(pD, pG) && IsPixEqual(pG, pH) && IsPixEqual(pH, pI) && !IsPixEqual(pE, pG))));
     vec2 origin = vec2(-1.0 / sqrt(2.0), 0.0);
     vec2 direction = vec2(1.0, 1.0);
     if (doLineBlend)
     {
-      bool haveShallowLine = (2.2 * dist_H_A <= dist_D_I) && (E != A) && (B != A);
-      bool haveSteepLine = (2.2 * dist_D_I <= dist_H_A) && (E != I) && (F != I);
+      bool haveShallowLine = (2.2 * dist_H_A <= dist_D_I) && (pE != pA) && (pB != pA);
+      bool haveSteepLine = (2.2 * dist_D_I <= dist_H_A) && (pE != pI) && (pF != pI);
       origin = haveShallowLine ? vec2(-0.25, 0.0) : vec2(-0.5, 0.0);
       direction.y += haveShallowLine ? 1.0 : 0.0;
       direction.x += haveSteepLine ? 1.0 : 0.0;
     }
-    vec4 blendPix = mix(H, D, step(Dist(E, D), Dist(E, H)));
+    vec4 blendPix = mix(pH, pD, step(Dist(pE, pD), Dist(pE, pH)));
     res = mix(res, blendPix, get_left_ratio(pos, origin, direction, scale));
   }
   if (blendResult.y != 0)
   {
-    float dist_B_I = Dist(B, I);
-    float dist_F_A = Dist(F, A);
+    float dist_B_I = Dist(pB, pI);
+    float dist_F_A = Dist(pF, pA);
     bool doLineBlend = (blendResult.y == 2 ||
-      !((blendResult.x != 0 && !IsPixEqual(E, I)) || (blendResult.z != 0 && !IsPixEqual(E, A)) ||
-        (IsPixEqual(I, F) && IsPixEqual(F, C) && IsPixEqual(C, B) && IsPixEqual(B, A) && !IsPixEqual(E, C))));
+      !((blendResult.x != 0 && !IsPixEqual(pE, pI)) || (blendResult.z != 0 && !IsPixEqual(pE, pA)) ||
+        (IsPixEqual(pI, pF) && IsPixEqual(pF, pC) && IsPixEqual(pC, pB) && IsPixEqual(pB, pA) && !IsPixEqual(pE, pC))));
     vec2 origin = vec2(1.0 / sqrt(2.0), 0.0);
     vec2 direction = vec2(-1.0, -1.0);
     if (doLineBlend)
     {
-      bool haveShallowLine = (2.2 * dist_B_I <= dist_F_A) && (E != I) && (H != I);
-      bool haveSteepLine = (2.2 * dist_F_A <= dist_B_I) && (E != A) && (D != A);
+      bool haveShallowLine = (2.2 * dist_B_I <= dist_F_A) && (pE != pI) && (pH != pI);
+      bool haveSteepLine = (2.2 * dist_F_A <= dist_B_I) && (pE != pA) && (pD != pA);
       origin = haveShallowLine ? vec2(0.25, 0.0) : vec2(0.5, 0.0);
       direction.y -= haveShallowLine ? 1.0 : 0.0;
       direction.x -= haveSteepLine ? 1.0 : 0.0;
     }
-    vec4 blendPix = mix(F, B, step(Dist(E, B), Dist(E, F)));
+    vec4 blendPix = mix(pF, pB, step(Dist(pE, pB), Dist(pE, pF)));
     res = mix(res, blendPix, get_left_ratio(pos, origin, direction, scale));
   }
   if (blendResult.x != 0)
   {
-    float dist_D_C = Dist(D, C);
-    float dist_B_G = Dist(B, G);
+    float dist_D_C = Dist(pD, pC);
+    float dist_B_G = Dist(pB, pG);
     bool doLineBlend = (blendResult.x == 2 ||
-      !((blendResult.w != 0 && !IsPixEqual(E, C)) || (blendResult.y != 0 && !IsPixEqual(E, G)) ||
-        (IsPixEqual(C, B) && IsPixEqual(B, A) && IsPixEqual(A, D) && IsPixEqual(D, G) && !IsPixEqual(E, A))));
+      !((blendResult.w != 0 && !IsPixEqual(pE, pC)) || (blendResult.y != 0 && !IsPixEqual(pE, pG)) ||
+        (IsPixEqual(pC, pB) && IsPixEqual(pB, pA) && IsPixEqual(pA, pD) && IsPixEqual(pD, pG) && !IsPixEqual(pE, pA))));
     vec2 origin = vec2(0.0, -1.0 / sqrt(2.0));
     vec2 direction = vec2(-1.0, 1.0);
     if (doLineBlend)
     {
-      bool haveShallowLine = (2.2 * dist_D_C <= dist_B_G) && (E != C) && (F != C);
-      bool haveSteepLine = (2.2 * dist_B_G <= dist_D_C) && (E != G) && (H != G);
+      bool haveShallowLine = (2.2 * dist_D_C <= dist_B_G) && (pE != pC) && (pF != pC);
+      bool haveSteepLine = (2.2 * dist_B_G <= dist_D_C) && (pE != pG) && (pH != pG);
       origin = haveShallowLine ? vec2(0.0, -0.25) : vec2(0.0, -0.5);
       direction.x -= haveShallowLine ? 1.0 : 0.0;
       direction.y += haveSteepLine ? 1.0 : 0.0;
     }
-    vec4 blendPix = mix(D, B, step(Dist(E, B), Dist(E, D)));
+    vec4 blendPix = mix(pD, pB, step(Dist(pE, pB), Dist(pE, pD)));
     res = mix(res, blendPix, get_left_ratio(pos, origin, direction, scale));
   }
   return res;

@@ -8,7 +8,6 @@ const HIT_REF := {ball_drop = 2.0, ball_pin = 7.0, pin_pin = 4.0, pin_floor = 3.
 const MIN_HIT := 0.35  # slower than this is resting / rocking, not a hit
 const REPEAT := 0.07   # the same two things can't make the same noise again sooner than this
 const PLANE_KIND := {lane = "floor", kickback = "wall", pit = "pit", cushion = "pit", pitfront = "pit"}
-const S := BowlingSetup
 
 var tun: Dictionary
 var layout: Array
@@ -27,14 +26,14 @@ var _last_hit := {}
 
 func _init(tuning: Dictionary, pin_layout = null) -> void:
 	tun = tuning
-	layout = pin_layout if pin_layout != null else S.pins()
+	layout = pin_layout if pin_layout != null else BowlingSetup.pins()
 	world = Physics.new(10)
-	world.add_plane(Vector3.UP, 0, 1.0, 0.0, "lane", Vector4(-S.KICKBACK, S.KICKBACK, -S.DECK_END, S.APPROACH))
-	world.add_plane(Vector3.UP, -S.PIT_DEPTH, 0.6, 0.05, "pit")
-	world.add_plane(Vector3.RIGHT, -S.KICKBACK, 0.2, 0.3, "kickback", Vector4(-10, 10, -S.PIT_BACK - 1, -S.KICKBACK_START))
-	world.add_plane(Vector3.LEFT, -S.KICKBACK, 0.2, 0.3, "kickback", Vector4(-10, 10, -S.PIT_BACK - 1, -S.KICKBACK_START))
-	world.add_plane(Vector3.BACK, -S.PIT_BACK, 0.8, 0.05, "cushion")
-	world.add_plane(Vector3.FORWARD, S.DECK_END, 0.4, 0.1, "pitfront", null, -0.005)
+	world.add_plane(Vector3.UP, 0, 1.0, 0.0, "lane", Vector4(-BowlingSetup.KICKBACK, BowlingSetup.KICKBACK, -BowlingSetup.DECK_END, BowlingSetup.APPROACH))
+	world.add_plane(Vector3.UP, -BowlingSetup.PIT_DEPTH, 0.6, 0.05, "pit")
+	world.add_plane(Vector3.RIGHT, -BowlingSetup.KICKBACK, 0.2, 0.3, "kickback", Vector4(-10, 10, -BowlingSetup.PIT_BACK - 1, -BowlingSetup.KICKBACK_START))
+	world.add_plane(Vector3.LEFT, -BowlingSetup.KICKBACK, 0.2, 0.3, "kickback", Vector4(-10, 10, -BowlingSetup.PIT_BACK - 1, -BowlingSetup.KICKBACK_START))
+	world.add_plane(Vector3.BACK, -BowlingSetup.PIT_BACK, 0.8, 0.05, "cushion")
+	world.add_plane(Vector3.FORWARD, BowlingSetup.DECK_END, 0.4, 0.1, "pitfront", null, -0.005)
 	rack()
 	world.on_contact = _contact
 
@@ -44,7 +43,7 @@ func _contact(a, b: Physics.Body, _j: float, c: Physics.Contact) -> void:
 		return
 	var kind := ""
 	var key := ""
-	if a is Physics.Plane:
+	if a is Physics.StaticPlane:
 		var surf: String = PLANE_KIND.get(a.name, "")
 		if surf == "":
 			return
@@ -76,7 +75,7 @@ func ball_sound() -> Array:
 	if ball == null or state != "rolling":
 		return ["", 0.0, 0.0]
 	var speed := Vector2(ball.v.x, ball.v.z).length()
-	if ball.pos.z < -S.DECK_END: return ["pit", speed, ball.pos.x]
+	if ball.pos.z < -BowlingSetup.DECK_END: return ["pit", speed, ball.pos.x]
 	if gutter != 0: return ["gutter", speed, ball.pos.x]
 	if ball.pos.y > tun.ball_radius + 0.012: return ["air", speed, ball.pos.x]
 	return ["lane", speed, ball.pos.x]
@@ -91,11 +90,11 @@ func rack() -> void:
 		world.remove_body(p.body)
 	pins = []
 	var spheres := []
-	for sp: Vector4 in S.pin_spheres():
-		spheres.append(Vector4(sp.x, sp.y - S.PIN_COM, sp.z, sp.w))
+	for sp: Vector4 in BowlingSetup.pin_spheres():
+		spheres.append(Vector4(sp.x, sp.y - BowlingSetup.PIN_COM, sp.z, sp.w))
 	for i in layout.size():
 		var spot: Vector2 = layout[i]
-		var b := world.add_body({pos = Vector3(spot.x, S.PIN_COM, spot.y), mass = tun.pin_mass, inertia = _pin_inertia(tun.pin_mass),
+		var b := world.add_body({pos = Vector3(spot.x, BowlingSetup.PIN_COM, spot.y), mass = tun.pin_mass, inertia = _pin_inertia(tun.pin_mass),
 			spheres = spheres, mu = tun.pin_mu, e = tun.pin_e, lin_damp = 0.05, ang_damp = 0.4, awake = false, kind = "pin", id = i + 1})
 		pins.append({body = b, spot = spot, n = i + 1, gone = false})
 
@@ -110,7 +109,7 @@ func sweep() -> void:
 			b.q = Quaternion.IDENTITY
 			b.v = Vector3.ZERO
 			b.w = Vector3.ZERO
-			b.pos.y = S.PIN_COM
+			b.pos.y = BowlingSetup.PIN_COM
 			b.awake = false; b.still = 0.0; b.lin_damp = 0.05; b.ang_damp = 0.4
 
 func is_standing(p: Dictionary) -> bool:
@@ -119,8 +118,8 @@ func is_standing(p: Dictionary) -> bool:
 	var b: Physics.Body = p.body
 	var up := b.q * Vector3.UP
 	if up.y < cos(tun.down_tilt): return false
-	if b.pos.y < S.PIN_COM - 0.05: return false
-	if b.pos.z < -S.DECK_END or absf(b.pos.x) > S.KICKBACK: return false
+	if b.pos.y < BowlingSetup.PIN_COM - 0.05: return false
+	if b.pos.z < -BowlingSetup.DECK_END or absf(b.pos.x) > BowlingSetup.KICKBACK: return false
 	return true
 
 func standing_count() -> int:
@@ -176,29 +175,29 @@ func step_once() -> void:
 	if b == null:
 		return
 	# gutter: once over the edge the ball runs in the channel past the pins
-	if gutter == 0 and b.pos.z < 0 and b.pos.z > -S.LENGTH + 0.2 and absf(b.pos.x) > S.HALF_WIDTH:
+	if gutter == 0 and b.pos.z < 0 and b.pos.z > -BowlingSetup.LENGTH + 0.2 and absf(b.pos.x) > BowlingSetup.HALF_WIDTH:
 		gutter = 1 if b.pos.x > 0 else -1
 		b.collide = false
 		events.append({kind = "ball_drop", speed = 1.0, pos = b.pos, t = t, level = 0.45})
 	if gutter != 0:
 		var r: float = tun.ball_radius
-		b.pos.x = gutter * (S.HALF_WIDTH + S.GUTTER_WIDTH / 2)
+		b.pos.x = gutter * (BowlingSetup.HALF_WIDTH + BowlingSetup.GUTTER_WIDTH / 2)
 		b.v.x = 0
-		if b.pos.z > -S.DECK_END:
-			b.pos.y = r - S.GUTTER_DEPTH
+		if b.pos.z > -BowlingSetup.DECK_END:
+			b.pos.y = r - BowlingSetup.GUTTER_DEPTH
 			b.v.y = 0
 			if b.v.z > -1.5:
 				b.v.z = -1.5 # gutter balls never stall in the channel
 		else:
 			var y := b.pos.y + b.v.y * DT
-			if y <= -S.PIT_DEPTH + r and not gutter_landed:
+			if y <= -BowlingSetup.PIT_DEPTH + r and not gutter_landed:
 				# the gutter ball doesn't collide with anything, so make its landing noise here
 				gutter_landed = true
 				events.append({kind = "pit", speed = 3.0, pos = b.pos, t = t, level = 0.6})
-			b.pos.y = maxf(-S.PIT_DEPTH + r, y)
+			b.pos.y = maxf(-BowlingSetup.PIT_DEPTH + r, y)
 			b.v.y -= 9.81 * DT
-		b.pos.z = maxf(b.pos.z, -S.PIT_BACK + r)
-	if deck_t == null and b.pos.z < -(S.LENGTH - 0.5):
+		b.pos.z = maxf(b.pos.z, -BowlingSetup.PIT_BACK + r)
+	if deck_t == null and b.pos.z < -(BowlingSetup.LENGTH - 0.5):
 		deck_t = t
 	if deck_t != null:
 		# the original's settling trick: after a while pins get heavier damping every frame
@@ -229,9 +228,9 @@ func finished() -> bool:
 	var pins_quiet := true
 	for p in pins:
 		var pb: Physics.Body = p.body
-		if not p.gone and pb.awake and pb.pos.z > -S.DECK_END and pb.pos.y > 0:
+		if not p.gone and pb.awake and pb.pos.z > -BowlingSetup.DECK_END and pb.pos.y > 0:
 			pins_quiet = false
-	var ball_done := ball.pos.z < -S.DECK_END or stop_t > 1.0
+	var ball_done := ball.pos.z < -BowlingSetup.DECK_END or stop_t > 1.0
 	if deck_t != null and t - deck_t > tun.max_turn_time: return true
 	if ball_done and pins_quiet and (deck_t == null or t - deck_t > 0.6): return true
 	if stop_t > 3: return true
