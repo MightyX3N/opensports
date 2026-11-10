@@ -113,8 +113,6 @@ def ambience():
 
 
 def main():
-    # straight into the Godot game's sounds
-    S.OUT = os.path.join(S.ROOT, "godot", "assets", "sounds")
     for i in range(3):
         S.save(T + f"hit_{i + 1}", hit(i, 0.7 + 0.15 * i), 0.85)
     for i in range(2):

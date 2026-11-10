@@ -1,0 +1,133 @@
+# Builds Open Sports for Windows: one OpenSports.exe (the game packed inside) next to the
+# rom/ and packs/ folders. Runs the headless tests first.
+# Download: the run's artifact "OpenSports-win64".
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  osble:
+    # the Bluetooth bridge for Joy-Con 2 as a Godot extension (Windows, MSVC)
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Build osble.dll
+      shell: pwsh
+      run: |
+        python -m pip install --quiet scons
+        git clone --depth 1 --branch 4.5 https://github.com/godotengine/godot-cpp native/osble_gd/godot-cpp
+        cd native/osble_gd
+        scons platform=windows target=template_release disable_exceptions=no -j4
+        Get-ChildItem bin
+    - uses: actions/upload-artifact@v4
+      with:
+        name: osble
+        path: native/osble_gd/bin/osble.dll
+
+  template:
+    # a smaller Windows export template: Godot built without what the game doesn't use
+    # (tools/size_profile.py). Cached: rebuilt only when the profile or Godot changes.
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: template
+        key: template-win64-${{ env.GODOT_VERSION }}-${{ hashFiles('tools/size_profile.py') }}
+    - name: Build the template (MinGW)
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq mingw-w64 > /dev/null
+        sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
+        sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+        python3 -m pip install --quiet scons
+        git clone --depth 1 --branch $GODOT_VERSION-stable https://github.com/godotengine/godot $RUNNER_TEMP/godot-src
+        cd $RUNNER_TEMP/godot-src
+        # (platform defaults beat the profile file, so the drivers are switched off here)
+        scons platform=windows target=template_release arch=x86_64 use_mingw=yes d3d12=no vulkan=no accesskit=no profile=$GITHUB_WORKSPACE/tools/size_profile.py -j$(nproc)
+        mkdir -p $GITHUB_WORKSPACE/template
+        cp bin/godot.windows.template_release.x86_64.exe $GITHUB_WORKSPACE/template/
+        ls -la $GITHUB_WORKSPACE/template
+    - uses: actions/upload-artifact@v4
+      with:
+        name: template
+        path: template/godot.windows.template_release.x86_64.exe
+        retention-days: 3
+
+  windows:
+    needs: [osble, template]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: osble
+        path: bin
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: template
+        path: ${{ runner.temp }}/template
+
+    - name: Get Godot and its export templates
+      run: |
+        V=$GODOT_VERSION
+        cd $RUNNER_TEMP
+        curl -sSLo godot.zip https://github.com/godotengine/godot/releases/download/$V-stable/Godot_v$V-stable_linux.x86_64.zip
+        unzip -q godot.zip
+        mv Godot_v$V-stable_linux.x86_64 godot-bin
+        curl -sSLo templates.tpz https://github.com/godotengine/godot/releases/download/$V-stable/Godot_v$V-stable_export_templates.tpz
+        mkdir -p ~/.local/share/godot/export_templates/$V.stable
+        unzip -q -j templates.tpz "templates/windows_release_x86_64.exe" "templates/windows_debug_x86_64.exe" "templates/version.txt" -d ~/.local/share/godot/export_templates/$V.stable
+        echo "G=$RUNNER_TEMP/godot-bin" >> $GITHUB_ENV
+
+    - name: Keep the editor binary (for running tests elsewhere)
+      uses: actions/upload-artifact@v4
+      with:
+        name: godot-linux
+        path: ${{ runner.temp }}/godot-bin
+        retention-days: 3
+
+    - name: Import the project
+      run: $G --headless --path . --import || $G --headless --path . --import
+
+    - name: Run tests
+      run: $G --headless --path . res://tests/run_tests.tscn
+
+    - name: Export for Windows
+      run: |
+        mkdir -p build
+        # our smaller template instead of the stock one
+        sed -i "s|^custom_template/release=.*|custom_template/release=\"$RUNNER_TEMP/template/godot.windows.template_release.x86_64.exe\"|" export_presets.cfg
+        $G --headless --path . --export-release "Windows Desktop" build/OpenSports.exe
+        ls -la build
+
+    - name: Package
+      run: |
+        out=$RUNNER_TEMP/OpenSports
+        mkdir -p $out/rom $out/packs/textures $out/packs/addons $out/licenses
+        cp build/OpenSports.exe $out/
+        cp build/*.dll $out/ 2>/dev/null || true
+        cp LICENSE $out/licenses/LICENSE.txt
+        cp THIRD_PARTY.md $out/licenses/
+        printf "Put your own Wii Sports or Wii Sports + Wii Sports Resort disc image here (.wbfs or .iso).\n" > $out/rom/README.txt
+        printf "Texture packs made for Dolphin go here: the pack's folder (for example RSPE01) with its tex1_*.png / .dds files.\n" > $out/packs/textures/README.txt
+        printf "Add-ons go here.\n" > $out/packs/addons/README.txt
+        cd $RUNNER_TEMP && zip -qr $GITHUB_WORKSPACE/OpenSports-win64.zip OpenSports
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: OpenSports-win64
+        path: OpenSports-win64.zip

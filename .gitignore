@@ -1,5 +1,10 @@
-*.love
-build/
+# Godot's import cache and the built extension (CI builds osble.dll into bin/)
+.godot/
+*.import
+bin/
+# the player's own disc, texture packs and add-ons, and build output
 /rom/
 /packs/
 /build/
+opensports.log
+__pycache__/
