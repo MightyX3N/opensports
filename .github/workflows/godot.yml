@@ -1,0 +1,57 @@
+# Builds the Godot version of Open Sports for Windows: one OpenSports.exe (the game packed
+# inside) next to the rom/ and packs/ folders. Runs the headless tests first.
+# Download: the run's artifact "OpenSports-godot-win64".
+name: Godot build
+
+on:
+  push:
+    branches: [godot]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Get Godot and its export templates
+      run: |
+        V=$GODOT_VERSION
+        curl -sSLo godot.zip https://github.com/godotengine/godot/releases/download/$V-stable/Godot_v$V-stable_linux.x86_64.zip
+        unzip -q godot.zip
+        mv Godot_v$V-stable_linux.x86_64 godot
+        curl -sSLo templates.tpz https://github.com/godotengine/godot/releases/download/$V-stable/Godot_v$V-stable_export_templates.tpz
+        mkdir -p ~/.local/share/godot/export_templates/$V.stable
+        unzip -q -j templates.tpz "templates/windows_release_x86_64.exe" "templates/windows_debug_x86_64.exe" "templates/version.txt" -d ~/.local/share/godot/export_templates/$V.stable
+
+    - name: Import the project
+      run: ./godot --headless --path godot --import || ./godot --headless --path godot --import
+
+    - name: Run tests
+      run: ./godot --headless --path godot -s tests/run_tests.gd
+
+    - name: Export for Windows
+      run: |
+        mkdir -p build
+        ./godot --headless --path godot --export-release "Windows Desktop" ../build/OpenSports.exe
+        ls -la build
+
+    - name: Package
+      run: |
+        out=OpenSports
+        mkdir -p $out/rom $out/packs/textures $out/packs/addons $out/licenses
+        cp build/OpenSports.exe $out/
+        cp LICENSE $out/licenses/LICENSE.txt
+        cp THIRD_PARTY.md $out/licenses/
+        printf "Put your own Wii Sports or Wii Sports + Wii Sports Resort disc image here (.wbfs or .iso).\n" > $out/rom/README.txt
+        printf "Texture packs made for Dolphin go here: the pack's folder (for example RSPE01) with its tex1_*.png / .dds files.\n" > $out/packs/textures/README.txt
+        printf "Add-ons go here.\n" > $out/packs/addons/README.txt
+        zip -qr OpenSports-godot-win64.zip $out
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: OpenSports-godot-win64
+        path: OpenSports-godot-win64.zip
