@@ -22,21 +22,28 @@ jobs:
         V=$GODOT_VERSION
         curl -sSLo godot.zip https://github.com/godotengine/godot/releases/download/$V-stable/Godot_v$V-stable_linux.x86_64.zip
         unzip -q godot.zip
-        mv Godot_v$V-stable_linux.x86_64 godot
+        mv Godot_v$V-stable_linux.x86_64 godot-bin
         curl -sSLo templates.tpz https://github.com/godotengine/godot/releases/download/$V-stable/Godot_v$V-stable_export_templates.tpz
         mkdir -p ~/.local/share/godot/export_templates/$V.stable
         unzip -q -j templates.tpz "templates/windows_release_x86_64.exe" "templates/windows_debug_x86_64.exe" "templates/version.txt" -d ~/.local/share/godot/export_templates/$V.stable
 
+    - name: Keep the editor binary (for running tests elsewhere)
+      uses: actions/upload-artifact@v4
+      with:
+        name: godot-linux
+        path: godot-bin
+        retention-days: 3
+
     - name: Import the project
-      run: ./godot --headless --path godot --import || ./godot --headless --path godot --import
+      run: ./godot-bin --headless --path godot --import || ./godot-bin --headless --path godot --import
 
     - name: Run tests
-      run: ./godot --headless --path godot -s tests/run_tests.gd
+      run: ./godot-bin --headless --path godot -s tests/run_tests.gd
 
     - name: Export for Windows
       run: |
         mkdir -p build
-        ./godot --headless --path godot --export-release "Windows Desktop" ../build/OpenSports.exe
+        ./godot-bin --headless --path godot --export-release "Windows Desktop" ../build/OpenSports.exe
         ls -la build
 
     - name: Package
