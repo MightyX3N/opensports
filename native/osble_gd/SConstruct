@@ -3,7 +3,8 @@
 #   scons platform=windows target=template_release disable_exceptions=no
 import os
 env = SConscript("godot-cpp/SConstruct")
-env.Append(CXXFLAGS=["/EHsc", "/bigobj", "/permissive-"])
+# C++/WinRT needs C++20 (its C++17 path uses removed experimental coroutines)
+env.Append(CXXFLAGS=["/EHsc", "/bigobj", "/permissive-", "/std:c++20"])
 env.Append(LIBS=["windowsapp"])
 lib = env.SharedLibrary("bin/osble{}".format(env["SHLIBSUFFIX"]), ["src/osble_godot.cpp"])
 Default(lib)
