@@ -9,11 +9,16 @@ const DEFAULTS := {
 	swing = "normal",      # swing strength needed for a fast ball: "light", "normal", "strong"
 	aim_line = true,       # dotted aim guide on the lane
 	physics = "arcade",
+	tennis_games = 1,      # games to win a tennis match: 1, 2 (best of 3) or 3 (best of 5)
+	tennis_skill = "normal", # the computer players: "easy", "normal", "hard"
 	texture_pack = true,   # use texture packs in packs/textures
 	upscale = "off",       # enlarge the disc's own textures with xBRZ: "off", "2x", "4x"
 	real_look = true,      # use the Wii Sports disc in rom/ when it's there
+	dsu = true,            # read motion controllers from a DSU (cemuhook) server
+	dsu_server = "127.0.0.1:26760", # where it is (edit settings.cfg for another computer or a phone)
 	auto_connect = true,   # listen for saved Joy-Con 2 and connect them when they wake up
-	saved = [],            # Joy-Con 2 this computer has connected before: { addr, pid, name }
+	saved = [],
+	button_maps = {},      # changed buttons: { "pad" or "jc2_<pid>": { action: [button, …] } }            # Joy-Con 2 this computer has connected before: { addr, pid, name }
 }
 const CHOICES := {
 	fullscreen = [false, true],
@@ -21,9 +26,12 @@ const CHOICES := {
 	volume = ["high", "medium", "low", "off"],
 	swing = ["light", "normal", "strong"],
 	aim_line = [true, false],
+	tennis_games = [1, 2, 3],
+	tennis_skill = ["easy", "normal", "hard"],
 	texture_pack = [true, false],
 	upscale = ["off", "2x", "4x"],
 	real_look = [true, false],
+	dsu = [true, false],
 	auto_connect = [true, false],
 }
 

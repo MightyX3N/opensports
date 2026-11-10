@@ -1,4 +1,4 @@
-## The menus: title screen, sport select, bowling mode select, controllers, settings and
+## The menus: title screen, sport select, the bowling and tennis mode selects, controllers, settings and
 ## the Wii Sports disc and textures page. Every screen works with a pointer, a D-pad or
 ## stick (focus moves to the nearest item in that direction), A to pick and B to go back.
 class_name Menus
@@ -8,10 +8,15 @@ var app # Main
 var screen := "title"
 var tab := "all"
 var disc_status := ""
+var mode_sport := "bowling" # whose mode screen "modes" shows
+var motion_reader: SwingReader # the motion check's swing reader
+var motion_last := {}          # the last swing it saw
+var motion_last_t := 0.0
+var motion_peak := 0.0
 
 const SPORTS := [
 	{id = "bowling", name = "Bowling", group = "classic", tint = Color(0.87, 0.93, 0.99), ready = true},
-	{id = "tennis", name = "Tennis", group = "classic", tint = Color(0.92, 0.97, 0.86)},
+	{id = "tennis", name = "Tennis", group = "classic", tint = Color(0.92, 0.97, 0.86), ready = true},
 	{id = "tabletennis", name = "Table tennis", group = "island", tint = Color(0.99, 0.90, 0.90)},
 	{id = "golf", name = "Golf", group = "classic", tint = Color(0.88, 0.96, 0.89)},
 	{id = "baseball", name = "Baseball", group = "classic", tint = Color(0.97, 0.93, 0.87)},
@@ -35,6 +40,8 @@ func _draw() -> void:
 		"wiidisc": _wiidisc()
 		"controllers": _controllers()
 		"pair": _pair()
+		"buttons": _buttons()
+		"motion": _motion()
 
 func back_button(label := "Back") -> void:
 	var r := back_button_shape(80, 640, label)
@@ -206,7 +213,7 @@ func _sports() -> void:
 			var sid: String = s.id
 			var sname: String = s.name
 			var ready: bool = s.get("ready", false)
-			item(Rect2(tx, ty, tw, th), "sport_" + sid, _pick_sport.bind(ready, sname), {r = 22, default = sid == "bowling"})
+			item(Rect2(tx, ty, tw, th), "sport_" + sid, _pick_sport.bind(ready, sname, sid), {r = 22, default = sid == "bowling"})
 	back_button()
 	var rx := 1176.0
 	var w2 := text_width("Settings", 18) + 48
@@ -229,6 +236,9 @@ func _lane_art(x: float, y: float, w: float, h: float) -> void:
 	circle(cx - 8, y + h - 78, 4, hc); circle(cx + 7, y + h - 80, 4, hc); circle(cx, y + h - 68, 4.5, hc)
 
 func _modes() -> void:
+	if mode_sport == "tennis":
+		_tennis_modes()
+		return
 	begin_items("modes")
 	rect(80, 64, 360, 556, 28, COL.card)
 	_lane_art(96, 80, 328, 290)
@@ -266,6 +276,60 @@ func _modes() -> void:
 	pill("Start", 1200 - w, 640, "primary", func(): app.start_bowling({physics = Settings.get_value("physics")}), w)
 	draw_focus()
 
+# ------------------------------------------------------------------ 3 tennis mode select
+func _court_art(x: float, y: float, w: float, h: float) -> void:
+	rect(x, y, w, h, 24, Color(0.86, 0.94, 0.84))
+	var cx := x + w / 2
+	var top := y + 30
+	var bot := y + h - 16
+	poly([Vector2(cx - 70, top), Vector2(cx + 70, top), Vector2(cx + 150, bot), Vector2(cx - 150, bot)], Color(0.40, 0.66, 0.30))
+	var lc := Color(0.97, 0.97, 0.94)
+	line([Vector2(cx - 70, top), Vector2(cx + 70, top), Vector2(cx + 150, bot), Vector2(cx - 150, bot), Vector2(cx - 70, top)], lc, 2)
+	var my := (top + bot) / 2 - 10
+	draw_line(Vector2(cx - 112, my), Vector2(cx + 112, my), Color(0.15, 0.2, 0.2), 4)
+	draw_line(Vector2(cx - 112, my - 3), Vector2(cx + 112, my - 3), lc, 2)
+	draw_line(Vector2(cx, top + 30), Vector2(cx, bot - 40), lc, 2)
+	circle(cx + 40, y + h - 70, 16, Color(0.86, 0.95, 0.20))
+	arc(cx + 40 - 20, y + h - 70, 13, -0.9, 0.9, Color(1, 1, 1), 2.5)
+
+func _tennis_modes() -> void:
+	begin_items("modes_tennis")
+	rect(80, 64, 360, 556, 28, COL.card)
+	_court_art(96, 80, 328, 290)
+	text("Tennis", 104, 390, 34)
+	text("Doubles: you and a partner against the computer. Your players run by themselves: just swing.", 104, 436, 14, COL.sub, "left", 312)
+	text("CHOOSE A MATCH", 476, 64, 13, COL.sub)
+	var games: int = Settings.get_value("tennis_games")
+	var modes := [[1, "1 game", "First to win a game"], [2, "Best of 3", "First to two games"], [3, "Best of 5", "First to three games"]]
+	for i in modes.size():
+		var md: Array = modes[i]
+		var y := 88 + i * 96
+		rect(476, y, 724, 82, 20, COL.card)
+		text(md[1], 500, y + 16, 20, COL.ink)
+		text(md[2], 500, y + 46, 14, COL.sub)
+		if games == md[0]:
+			selected(476, y, 724, 82, 20)
+		var n: int = md[0]
+		item(Rect2(476, y, 724, 82), "tgames_%d" % n, func(): Settings.set_value("tennis_games", n), {r = 20})
+	text("OPPONENTS", 476, 384, 13, COL.sub)
+	var skill: String = Settings.get_value("tennis_skill")
+	var levels := [["easy", "Easy"], ["normal", "Normal"], ["hard", "Hard"]]
+	for i in levels.size():
+		var lv: Array = levels[i]
+		var bx := 476 + i * 160
+		var on: bool = skill == lv[0]
+		rect(bx, 406, 150, 40, 20, COL.blue if on else COL.soft)
+		text(lv[1], bx, 416, 16, COL.card if on else COL.ink, "center", 150)
+		var id: String = lv[0]
+		item(Rect2(bx, 406, 150, 40), "tskill_" + id, func(): Settings.set_value("tennis_skill", id), {r = 20})
+	back_button()
+	var w := text_width("Start", 18) + 80
+	pill("Start", 1200 - w, 640, "primary", _start_tennis, w)
+	draw_focus()
+
+func _start_tennis() -> void:
+	app.start_tennis({games = Settings.get_value("tennis_games"), skill = Settings.get_value("tennis_skill")})
+
 # ------------------------------------------------------------------ controllers
 func _controllers() -> void:
 	begin_items("controllers")
@@ -279,9 +343,129 @@ func _controllers() -> void:
 		var st := "In play" if c == Inputs.current else "Ready"
 		text(st, 500, y + 19, 13, COL.blue_dark if c == Inputs.current else COL.green_ink, "right", 120)
 		item(Rect2(80, y, 560, 54), "ctrl_%d" % i, func(): Inputs.current = c, {r = 18, default = c == Inputs.current})
-	text("Plug in a gamepad, or connect Joy-Con 2 here. A controller that sends motion bowls with full motion.",
+	text("Plug in a gamepad, or connect Joy-Con 2 here. A controller that sends motion plays with full motion.",
 		700, 140, 15, COL.sub, "left", 480)
-	pill("Connect Joy-Con 2", 700, 220, "primary", func(): app.go("pair"), 300)
+	pill("Connect Joy-Con 2", 700, 200, "primary", func(): app.go("pair"), 300)
+	pill("Check motion", 700, 262, "", func(): app.go("motion"), 300)
+	pill("Change buttons", 700, 324, "", func(): app.go("buttons"), 300)
+	var dsu_txt := "DSU motion servers: off (Settings)"
+	if Settings.get_value("dsu"):
+		dsu_txt = "DSU: %s · %d controller%s" % [DSU.status, DSU.slots.size(), "" if DSU.slots.size() == 1 else "s"]
+	text(dsu_txt, 700, 396, 13, COL.sub, "left", 480)
+	back_button()
+	draw_focus()
+
+# ------------------------------------------------------------------ buttons
+func _buttons() -> void:
+	begin_items("buttons")
+	var c = Inputs.current
+	header("SETUP · " + c.name.to_upper(), "Change buttons")
+	var key := Inputs.map_key(c)
+	if key == "":
+		rect(80, 130, 1120, 80, 20, COL.card)
+		var why := "The mouse and keyboard can't be changed here." if c.kind == "mouse" else "This controller's buttons are set in its own app (DSU server)."
+		text(why + " Pick a gamepad or Joy-Con 2 on the Controllers screen first.", 110, 158, 16, COL.sub, "left", 1060)
+		back_button()
+		draw_focus()
+		return
+	var li = Inputs.listening
+	for i in Inputs.ACTIONS.size():
+		var act: String = Inputs.ACTIONS[i]
+		var y := 128 + i * 66
+		var waiting: bool = li != null and li.action == act
+		rect(80, y, 720, 56, 18, COL.blue_soft if waiting else COL.card)
+		text(Inputs.ACTION_NAMES[act], 110, y + 17, 17)
+		var names := []
+		for s in Inputs.binding(c, act):
+			names.append(Inputs.source_name(s))
+		var val := "Press a button… (Esc cancels)" if waiting else (" / ".join(names) if not names.is_empty() else "—")
+		text(val, 470, y + 18, 16, COL.blue_dark if waiting else COL.ink, "right", 300)
+		item(Rect2(80, y, 720, 56), "map_" + act, _start_map.bind(c, act), {r = 18})
+	text("Pick an action, then press the button you want for it on the controller.", 840, 140, 15, COL.sub, "left", 360)
+	text("Saved for every " + ("Joy-Con 2 of this kind." if c.kind == "joycon2" else "gamepad."), 840, 196, 15, COL.sub, "left", 360)
+	pill("Back to defaults", 840, 250, "", _reset_buttons.bind(c), 300)
+	back_button()
+	draw_focus()
+
+func _start_map(c, act: String) -> void:
+	Inputs.listen_for(c, act)
+	Snd.ui("select")
+
+func _reset_buttons(c) -> void:
+	Inputs.reset_buttons(c)
+	app.toast("Buttons back to their defaults")
+
+# ------------------------------------------------------------------ motion check
+func _motion() -> void:
+	begin_items("motion")
+	var c = Inputs.current
+	header("SETUP · " + c.name.to_upper(), "Check motion")
+	if c.level != Inputs.FULL or not c.has_gyro:
+		rect(80, 130, 1120, 80, 20, COL.card)
+		text("This controller doesn't send motion. Connect a Joy-Con 2, or a motion controller through a DSU server, and pick it on the Controllers screen.",
+			110, 150, 16, COL.sub, "left", 1060)
+		back_button()
+		draw_focus()
+		return
+	if motion_reader == null or motion_reader.ctrl != c:
+		motion_reader = SwingReader.new(c)
+		motion_last = {}
+	var a: Vector3 = Inputs.angles(c.orient)
+	# where it points: a dot on a target, moved by turning (yaw) and tilting (pitch)
+	rect(80, 128, 420, 420, 28, COL.card)
+	var cx := 290.0
+	var cy := 338.0
+	for r in [60.0, 120.0, 180.0]:
+		arc(cx, cy, r, 0, TAU, COL.line, 2)
+	draw_line(Vector2(cx - 190, cy), Vector2(cx + 190, cy), COL.line, 1)
+	draw_line(Vector2(cx, cy - 190), Vector2(cx, cy + 190), COL.line, 1)
+	var px := cx - clampf(a.x / 0.9, -1, 1) * 180
+	var py := cy - clampf(a.y / 0.9, -1, 1) * 180
+	circle(px, py, 16, COL.blue)
+	# roll: a bar through the dot
+	var rv := Vector2(cos(a.z), sin(a.z)) * 30
+	draw_line(Vector2(px, py) - rv, Vector2(px, py) + rv, COL.card, 4)
+	text("Point at the middle and press re-centre (%s)" % ("X / Up" if c.kind == "joycon2" else "Y"), 80, 560, 14, COL.sub, "center", 420)
+	# numbers and the swing meter
+	var x := 540.0
+	rect(x, 128, 660, 420, 28, COL.card)
+	text("Turn %+.0f°   Tilt %+.0f°   Roll %+.0f°" % [rad_to_deg(a.x), rad_to_deg(a.y), rad_to_deg(a.z)], x + 30, 150, 18)
+	var rate := 0
+	if c.history.size() > 1:
+		rate = int(round((c.history.size() - 1) / maxf(0.001, c.history[-1].t - c.history[0].t)))
+	text("%d readings a second%s" % [rate, ("  ·  " + c.rate_text) if c.rate_text != "" else ""], x + 30, 182, 14, COL.sub)
+	var sp: float = c.gyro.length()
+	motion_peak = maxf(sp, motion_peak - 0.016 * 20)
+	text("SWING SPEED", x + 30, 230, 12, COL.sub)
+	rect(x + 30, 250, 600, 24, 12, COL.soft)
+	rect(x + 30, 250, 600 * clampf(sp / SwingReader.FULL, 0, 1), 24, 12, COL.blue)
+	var pk := x + 30 + 600 * clampf(motion_peak / SwingReader.FULL, 0, 1)
+	draw_line(Vector2(pk, 246), Vector2(pk, 278), COL.ink, 2)
+	var mk := x + 30 + 600 * SwingReader.MIN_PEAK / SwingReader.FULL
+	draw_line(Vector2(mk, 244), Vector2(mk, 280), COL.red, 2)
+	text("a swing counts past the red line", x + 30, 284, 12, COL.sub)
+	var sw := motion_reader.update(1.0 / 60)
+	if not sw.is_empty():
+		motion_last = sw
+		motion_last_t = Time.get_ticks_msec() / 1000.0
+		Snd.ui("toggle")
+	text("LAST SWING", x + 30, 330, 12, COL.sub)
+	if motion_last.is_empty():
+		text("Swing it like a racket", x + 30, 352, 22, COL.sub)
+	else:
+		var shape_name := {flat = "Drive", slice = "Slice (high to low)", lob = "Lob (low to high)"}
+		var fresh := Time.get_ticks_msec() / 1000.0 - motion_last_t < 0.6
+		text("%s · power %d%%" % [shape_name.get(motion_last.shape, motion_last.shape), int(motion_last.power * 100)], x + 30, 352, 26,
+			COL.blue if fresh else COL.ink)
+	var held := []
+	for k in ["a", "b", "back", "plus", "recentre", "sclick", "up", "down", "left", "right"]:
+		if c.buttons.get(k, false):
+			held.append(k)
+	text("BUTTONS", x + 30, 420, 12, COL.sub)
+	text(", ".join(held) if not held.is_empty() else "none held", x + 30, 440, 17)
+	if c.pressed.get("recentre", false):
+		c.recentre()
+	pill("Re-centre", x + 30, 480, "", func(): c.recentre(), 200)
 	back_button()
 	draw_focus()
 
@@ -337,6 +521,7 @@ const ROWS := [
 	{key = "aim_line", label = "Aim line", sub = "The dotted guide on the lane"},
 	{section = "CONTROLLERS"},
 	{key = "auto_connect", label = "Connect saved Joy-Cons by themselves", sub = "Press SYNC on a saved Joy-Con on any screen"},
+	{key = "dsu", label = "Motion controllers over DSU", sub = "DS4Windows, BetterJoy, phone gyro apps (server address in settings.cfg)"},
 	{action = "controllers", label = "Controllers", sub = "Connected controllers and which one is in play"},
 	{section = "YOUR WII SPORTS DISC"},
 	{action = "wiidisc", label = "Wii Sports disc and textures", sub = "The real Wii Sports look, texture packs and upscaling"},
@@ -396,8 +581,9 @@ func _rows(rows: Array, first_default: String) -> void:
 			item(Rect2(80, y, 1120, 50), "set_packs", _rescan_packs, {r = 18})
 		y += 54
 
-func _pick_sport(ready: bool, sname: String) -> void:
+func _pick_sport(ready: bool, sname: String, sid := "bowling") -> void:
 	if ready:
+		mode_sport = sid
 		app.go("modes")
 	else:
 		app.toast(sname + " is coming soon")

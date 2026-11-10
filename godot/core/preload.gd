@@ -1,5 +1,6 @@
 ## Loads everything the games need while the menus are up, so starting a game is instant:
-## the alley from the player's disc (or our own), pins, ball, the bowler and the sounds.
+## the alley from the player's disc (or our own), pins, ball, the bowler, the tennis court
+## and the sounds.
 ## Shaders are compiled by drawing it all once off screen.
 extends Node
 
@@ -7,6 +8,8 @@ signal finished
 
 var alley = null # DiscAlley or OwnAlley
 var real := false
+var court = null # TennisDiscCourt or TennisOwnCourt
+var court_real := false
 var loading := false
 var status := ""
 
@@ -38,16 +41,28 @@ func start() -> void:
 			for n in OwnAlley.HALL + ["pin", "ball", "shadow"]:
 				OwnAlley.mesh(n))
 		alley = OwnAlley.build()
+	# the tennis court
+	court = null
+	court_real = false
+	if GameData.available():
+		var c = await TennisDiscCourt.build(get_tree())
+		if c != null:
+			court = c
+			court_real = true
+	if court == null:
+		court = TennisOwnCourt.build()
 	# the bowler and the sounds
 	for f in ["robot.glb"] + Character.ANIMS:
 		load(Character.DIR + f)
 	Snd.preload_sounds(["bowling/ball_drop", "bowling/ball_pin", "bowling/crash", "bowling/clack", "bowling/pin_wall",
 		"bowling/pit", "bowling/pin_pit", "bowling/crowd_strike", "bowling/crowd_spare", "bowling/jingle_strike",
 		"bowling/jingle_spare", "bowling/jingle_gutter", "bowling/jingle_gameover", "bowling/roll_loop",
-		"bowling/roll_gutter_loop", "bowling/ambience_loop"])
+		"bowling/roll_gutter_loop", "bowling/ambience_loop", "tennis/hit", "tennis/bounce", "tennis/net", "tennis/swish",
+		"tennis/crowd_point", "tennis/crowd_game", "tennis/jingle_game", "tennis/jingle_match", "tennis/jingle_lose",
+		"tennis/ambience_loop"])
 	await _warm_up()
-	Log.write("preload: %s alley ready in %d ms (texture pack images: %d, upscale %s)" % ["real" if real else "own",
-		Time.get_ticks_msec() - t0, TexturePacks.count, Settings.get_value("upscale")])
+	Log.write("preload: %s alley, %s court ready in %d ms (texture pack images: %d, upscale %s)" % ["real" if real else "own",
+		"real" if court_real else "own", Time.get_ticks_msec() - t0, TexturePacks.count, Settings.get_value("upscale")])
 	status = "Wii Sports disc ready" if real else ""
 	loading = false
 	finished.emit()
@@ -76,6 +91,16 @@ func _warm_up() -> void:
 	for i in 3:
 		await RenderingServer.frame_post_draw
 	vp.remove_child(alley.hall)
+	# the tennis court, ball and racket too
+	vp.add_child(court.field)
+	cam.look_at_from_position(Vector3(0, 5.6, 21.5), Vector3(0, 0.4, -2.5))
+	var more := [court.make_ball(), court.make_racket()]
+	for i in more.size():
+		more[i].position = Vector3(i, 1, 10)
+		vp.add_child(more[i])
+	for i in 3:
+		await RenderingServer.frame_post_draw
+	vp.remove_child(court.field)
 	vp.queue_free()
 
 ## the disc, packs or upscaling changed: load again
@@ -85,4 +110,7 @@ func restart() -> void:
 	if alley != null and alley.hall != null and alley.hall.get_parent() == null:
 		alley.hall.free()
 	alley = null
+	if court != null and court.field != null and court.field.get_parent() == null:
+		court.field.free()
+	court = null
 	start()

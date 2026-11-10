@@ -1,9 +1,12 @@
-## Open Sports: the screens (menus, the bowling game) and what moves between them.
+## Open Sports: the screens (menus, the games) and what moves between them.
 extends Node
 
+const GAMES := ["bowling", "tennis"]
+
 var menus: Menus
-var hud: BowlingHud
-var game: BowlingGame
+var hud: UICanvas         # the playing game's HUD
+var huds := {}            # sport -> its HUD
+var game: Node3D          # BowlingGame or TennisGame
 var screen := "title"
 var stack := []
 var toast_text := ""
@@ -19,18 +22,21 @@ func _ready() -> void:
 	menus = Menus.new()
 	menus.app = self
 	layer.add_child(menus)
-	hud = BowlingHud.new()
-	hud.app = self
-	hud.visible = false
-	layer.add_child(hud)
+	huds = {bowling = BowlingHud.new(), tennis = TennisHud.new()}
+	for k in huds:
+		huds[k].app = self
+		huds[k].visible = false
+		layer.add_child(huds[k])
+	hud = huds.bowling
 	_toast_ui = ToastUI.new()
 	_toast_ui.app = self
 	layer.add_child(_toast_ui)
 	apply_setting("fullscreen", Settings.get_value("fullscreen"))
 	apply_setting("quality", Settings.get_value("quality"))
-	# a test can start straight in a game: OPENSPORTS_START=bowling
-	if OS.get_environment("OPENSPORTS_START") == "bowling":
-		start_bowling({physics = "arcade"})
+	# a test can start straight in a game: OPENSPORTS_START=bowling / tennis
+	match OS.get_environment("OPENSPORTS_START"):
+		"bowling": start_bowling({physics = "arcade"})
+		"tennis": start_tennis({games = 1, skill = "normal"})
 
 func toast(s: String) -> void:
 	toast_text = s
@@ -38,14 +44,17 @@ func toast(s: String) -> void:
 
 func _switch(name: String) -> void:
 	menus.clear_items()
-	if screen == "bowling" and name != "bowling" and game != null:
+	if screen in GAMES and name != screen and game != null:
 		game.silence()
 		game.visible = false
 		game.set_process(false)
 	screen = name
-	var in_game := name == "bowling"
+	var in_game := name in GAMES
 	menus.visible = not in_game
-	hud.visible = in_game
+	if in_game:
+		hud = huds[name]
+	for k in huds:
+		huds[k].visible = in_game and k == name
 	if in_game and game != null:
 		game.visible = true
 		game.set_process(true)
@@ -74,7 +83,7 @@ func root(name: String) -> void:
 	stack = [] if name == "title" else ["title"]
 	if name == "modes":
 		stack.append("sports")
-	if game != null and name != "bowling":
+	if game != null and not name in GAMES:
 		game.silence()
 		game.release_hall()
 		game.queue_free()
@@ -82,15 +91,23 @@ func root(name: String) -> void:
 	_switch(name)
 
 func start_bowling(opts: Dictionary) -> void:
+	_start("bowling", BowlingGame.new(), opts)
+
+func start_tennis(opts: Dictionary) -> void:
+	_start("tennis", TennisGame.new(), opts)
+
+func _start(sport: String, g: Node3D, opts: Dictionary) -> void:
 	if game != null:
+		game.silence()
 		game.release_hall()
 		game.queue_free()
-	game = BowlingGame.new()
+	game = g
 	game.opts = opts
 	add_child(game)
-	hud.game = game
+	huds[sport].game = game
 	stack = ["title", "sports", "modes"]
-	_switch("bowling")
+	menus.mode_sport = sport
+	_switch(sport)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -112,7 +129,8 @@ func textures_changed() -> void:
 		game.release_hall()
 		game.queue_free()
 		game = null
-		stack.erase("bowling")
+		for k in GAMES:
+			stack.erase(k)
 	Preload.restart()
 
 func _process(dt: float) -> void:
@@ -126,7 +144,7 @@ func _process(dt: float) -> void:
 	var nav := Inputs.take_nav()
 	if nav.is_empty():
 		pass
-	elif screen == "bowling":
+	elif screen in GAMES:
 		hud.nav(nav)
 	else:
 		menus.nav(nav)
@@ -137,21 +155,22 @@ func _process(dt: float) -> void:
 				go("sports")
 
 func _unhandled_input(e: InputEvent) -> void:
-	var ui: UICanvas = hud if screen == "bowling" else menus
+	var playing := screen in GAMES
+	var ui: UICanvas = hud if playing else menus
 	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 		var p := ui.get_local_mouse_position()
 		if e.pressed:
-			if screen == "bowling":
+			if playing:
 				hud.pointer_down(p)
 			elif screen == "title":
 				go("sports")
 			else:
 				menus.mouse_click(p)
-		elif screen == "bowling" and game != null:
+		elif playing and game != null:
 			game.pointer_up()
 	elif e is InputEventMouseMotion:
 		var p := ui.get_local_mouse_position()
-		if screen == "bowling":
+		if playing:
 			if game != null:
 				game.pointer_move(p)
 				if game.paused or game.phase == "over":

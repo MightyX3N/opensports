@@ -33,8 +33,39 @@ jobs:
         name: osble
         path: native/osble_gd/bin/osble.dll
 
+  template:
+    # a smaller Windows export template: Godot built without what the game doesn't use
+    # (tools/godot/size_profile.py). Cached: rebuilt only when the profile or Godot changes.
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: template
+        key: template-win64-${{ env.GODOT_VERSION }}-${{ hashFiles('tools/godot/size_profile.py') }}
+    - name: Build the template (MinGW)
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq mingw-w64 > /dev/null
+        sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
+        sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+        python3 -m pip install --quiet scons
+        git clone --depth 1 --branch $GODOT_VERSION-stable https://github.com/godotengine/godot godot-src
+        cd godot-src
+        scons platform=windows target=template_release arch=x86_64 use_mingw=yes profile=../tools/godot/size_profile.py -j$(nproc)
+        mkdir -p ../template
+        cp bin/godot.windows.template_release.x86_64.exe ../template/
+        ls -la ../template
+    - uses: actions/upload-artifact@v4
+      with:
+        name: template
+        path: template/godot.windows.template_release.x86_64.exe
+        retention-days: 3
+
   windows:
-    needs: osble
+    needs: [osble, template]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -43,6 +74,11 @@ jobs:
       with:
         name: osble
         path: godot/bin
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: template
+        path: template
 
     - name: Get Godot and its export templates
       run: |
@@ -70,6 +106,8 @@ jobs:
     - name: Export for Windows
       run: |
         mkdir -p build
+        # our smaller template instead of the stock one
+        sed -i "s|^custom_template/release=.*|custom_template/release=\"$PWD/template/godot.windows.template_release.x86_64.exe\"|" godot/export_presets.cfg
         ./godot-bin --headless --path godot --export-release "Windows Desktop" ../build/OpenSports.exe
         ls -la build
 

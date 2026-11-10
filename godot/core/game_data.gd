@@ -9,6 +9,10 @@ const GAME_IDS := ["RSP", "SP2"]
 ## what we use, by the end of its path on the disc
 const FILES := {
 	bow_common = "Common/RPBowScene/common.carc",
+	tns_common = "Common/RPTnsScene/common.carc",
+	tns_field = "Stage/RPTnsScene/tns_Field_a.carc",
+	tns_field_b = "Stage/RPTnsScene/tns_Field_b.carc",
+	tns_sound = "Sound/RPTnsScene/rp_Tns_sound.brsar",
 }
 
 var disc: WiiDisc

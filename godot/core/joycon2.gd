@@ -160,7 +160,6 @@ static func _read(c, frame_dt: float) -> void:
 	var n := reports.size()
 	if n == 0:
 		return
-	var defaults: Dictionary = DEFAULTS.get(c.ble.pid, DEFAULTS[0x2069])
 	for i in n:
 		var p: PackedByteArray = reports[i]
 		if p[63] == 1:
@@ -201,15 +200,20 @@ static func _read(c, frame_dt: float) -> void:
 		var ga := to_game(Vector3(_s16(p, 0x36), _s16(p, 0x38), _s16(p, 0x3A)), Vector3(_s16(p, 0x30), _s16(p, 0x32), _s16(p, 0x34)))
 		c.feed(dt, ga[0], ga[1])
 		if i == n - 1:
+			var raw := {}
+			for bn in BUTTONS:
+				var bb: Array = BUTTONS[bn]
+				raw[bn] = (p[4 + bb[0]] & (1 << bb[1])) != 0
+			c.set_meta("raw", raw)
 			for logical in ["a", "b", "back", "plus", "recentre", "sclick", "up", "down", "left", "right"]:
-				var bn: String = defaults.get(logical, "")
 				var down := false
-				if bn != "":
-					var bb: Array = BUTTONS[bn]
-					down = (p[4 + bb[0]] & (1 << bb[1])) != 0
+				for bn in Inputs.binding(c, logical):
+					down = down or raw.get(bn, false)
 				c.set_button(logical, down)
 			var st := _stick(p, 0x0D if c.ble.pid == 0x2066 else 0x0A)
 			c.stick = st
+			if c.ble.pid == 0x2069:
+				c.rstick = _stick(p, 0x0D)
 			c.set_button("up", c.buttons.get("up", false) or st.y > 0.6)
 			c.set_button("down", c.buttons.get("down", false) or st.y < -0.6)
 			c.set_button("left", c.buttons.get("left", false) or st.x < -0.6)
