@@ -103,6 +103,25 @@ func _warm_up() -> void:
 	vp.remove_child(court.field)
 	vp.queue_free()
 
+## the game is closing: free the alley and court kept between games (they're out of the
+## tree then) and the shared caches, so nothing is left for the renderer to trip over
+func _exit_tree() -> void:
+	for n in [alley.hall if alley != null else null, court.field if court != null else null]:
+		if n != null and is_instance_valid(n) and n.get_parent() == null:
+			n.free()
+	alley = null
+	court = null
+	WiiModel.clear_textures()
+	WiiModel._shader_cache.clear()
+	DiscAlley._tinted.clear()
+	OwnAlley._meshes.clear()
+	OwnAlley._mats.clear()
+	TennisOwnCourt._mat = null
+	TennisOwnCourt._ball = null
+	TennisOwnCourt._racket = null
+	Upscale.clear()
+	TexturePacks.reset()
+
 ## the disc, packs or upscaling changed: load again
 func restart() -> void:
 	if loading:

@@ -102,6 +102,17 @@ func _ready() -> void:
 		DSU.start(Settings.get_value("dsu_server"))
 	Settings.changed.connect(_on_setting)
 
+## closing: let go of the DSU socket and its controllers before the engine shuts down
+func _exit_tree() -> void:
+	DSU.stop()
+	DSU._crc_table = PackedInt64Array()
+	JoyCon2.found = []
+	JoyCon2.pads = {}
+	listening = null
+	list.clear()
+	mouse = null
+	current = null
+
 func _on_setting(k: String, _v) -> void:
 	if k == "dsu" or k == "dsu_server":
 		if Settings.get_value("dsu"):

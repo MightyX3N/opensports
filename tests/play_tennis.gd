@@ -10,8 +10,14 @@ var main: Node
 var fails := 0
 var shots := {}
 
+var log_lines := PackedStringArray()
+
 func L(s: String) -> void:
 	print(s)
+	log_lines.append(s)
+	var f := FileAccess.open(out.path_join("log.txt"), FileAccess.WRITE)
+	if f != null:
+		f.store_string("\n".join(log_lines) + "\n")
 
 func check(c: bool, what: String) -> void:
 	if c:
