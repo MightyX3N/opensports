@@ -1,5 +1,7 @@
--- Input test app: the "Motion test", "Motion check", "Axis wizard" and "Buttons"
--- screens from the design canvas. Build order step 1 (architecture §11).
+-- The app: menus (title, sport select, modes, controllers, settings), the controller
+-- setup screens ("Motion test", "Motion check", "Axis wizard", "Buttons", connecting a
+-- Joy-Con 2) and the sports. Screens are kept on a stack, so Back always returns to
+-- where you came from.
 local m = require("core.math")
 local motion = require("core.motion")
 local cal = require("core.calibrate")
@@ -8,10 +10,14 @@ local U = require("shells.love.ui")
 local I = require("shells.love.input")
 local remote = require("shells.love.remote3d")
 local bowling = require("shells.love.bowling")
+local menus = require("shells.love.menus")
+local settings = require("shells.love.settings")
+local gfx = require("shells.love.gfx3d")
+local Snd = require("shells.love.sound")
 local lg = love.graphics
 local C = U.col
 
-local app = { screen = "bowling", sel = 1, focus = 0, hits = {}, lastSwing = nil, trace = {} }
+local app = { screen = "title", stack = {}, sel = 1, focus = 0, hits = {}, lastSwing = nil, trace = {} }
 
 local function ctrl() return I.list[app.sel] or I.list[1] end
 local function detectorFor(c)
@@ -26,7 +32,7 @@ local screens = {}
 local function footer(items)
   if app.focus == nil then app.focus = #items end -- default focus: the main action
   local hits = {}
-  hits.back = U.backButton(80, 640, app.focus == 0, app.screen == "test" and "Quit" or "Back")
+  hits.back = U.backButton(80, 640, app.focus == 0, "Back")
   local x = 1200
   for i = #items, 1, -1 do
     local it = items[i]
@@ -149,7 +155,7 @@ function screens.test.draw()
   stat(906, "SPIN", s and string.format("%+.1f %s", s.spin, s.spin >= 0 and "right" or "left") or "—")
   stat(1046, "AIM", s and string.format("%.0f° %s", math.abs(math.deg(s.aim)), s.aim >= 0 and "left" or "right") or "—")
 
-  footer({ { "Connect Joy-Con 2", "pair" }, { "Buttons", "remap" }, { "Motion check", "check" }, { "Recentre", "recentre" }, { "Next", "next", nil }, { "Bowling", "bowling", "primary" } })
+  footer({ { "Buttons", "remap" }, { "Motion check", "check" }, { "Recentre", "recentre" }, { "Next", "next", "primary" } })
 end
 
 function screens.test.update(dt)
@@ -343,7 +349,9 @@ end
 ------------------------------------------------------------ Pair Joy-Con 2
 screens.pair = {}
 function screens.pair.enter() app.pairSel = 1; if I.jc2.available then I.jc2.scan(true) end end
-function screens.pair.leave() if I.jc2.available then I.jc2.scan(false) end end
+function screens.pair.leave()
+  if I.jc2.available then I.jc2.scan(false); I.jc2.background = false end -- background listening resumes by itself
+end
 function screens.pair.draw()
   local B = I.jc2
   U.header("SETUP · BLUETOOTH", "Connect Joy-Con 2")
@@ -359,7 +367,7 @@ function screens.pair.draw()
   for i = 0, 3 do lg.setColor(i == 1 and C.green or C.line); lg.circle("fill", 380 + i * 22, 360, 6) end
   lg.setColor(C.blue); lg.setLineWidth(3); lg.circle("line", 282, 360, 18); lg.setLineWidth(1)
   U.text("SYNC", 252, 392, 13, C.blueDark, "center", 60)
-  U.text("Windows doesn't list Joy-Con 2 under Bluetooth settings — the game connects to them directly. Press SYNC every time you connect.",
+  U.text("Windows doesn't list Joy-Con 2 under Bluetooth settings — the game connects to them directly. After the first time it's saved: just press SYNC on it on any screen.",
     110, 446, 14, C.sub, "left", 480)
 
   U.text("CONTROLLERS NEARBY", 652, 130, 16, C.sub)
@@ -387,6 +395,9 @@ function screens.pair.draw()
   footer({ { "Search again", "rescan" }, { "Done", "back", "primary" } })
 end
 
+------------------------------------------------------------ menus
+for _, name in ipairs({ "title", "sports", "modes", "controllers", "settings" }) do screens[name] = menus[name] end
+
 ------------------------------------------------------------ Bowling
 screens.bowling = {
   update = bowling.update, draw = bowling.drawHud, draw3d = bowling.draw3d, nav = bowling.nav,
@@ -394,12 +405,42 @@ screens.bowling = {
 }
 
 ------------------------------------------------------------ actions
-local function go(name)
+local function switch(name)
+  menus.clearItems()
   if screens[app.screen].leave then screens[app.screen].leave() end
   app.screen = name
   app.focus = (name == "remap" or name == "pair") and -1 or nil
   if screens[name].enter then screens[name].enter() end
 end
+-- open a screen on top of the current one
+local function go(name)
+  if name == app.screen then return end
+  app.stack[#app.stack + 1] = app.screen
+  switch(name)
+end
+-- back to the screen we came from
+local function back()
+  Snd.ui("back")
+  local prev = table.remove(app.stack)
+  if not prev then
+    if app.screen ~= "title" then switch("title") end
+    return
+  end
+  menus.clearItems()
+  if screens[app.screen].leave then screens[app.screen].leave() end
+  app.screen = prev
+  app.focus = (prev == "remap" or prev == "pair") and -1 or nil
+  -- returning to a screen doesn't restart it (a game in progress stays as it was)
+  if screens[prev].resume then screens[prev].resume() end
+end
+-- jump straight to a menu screen, forgetting everything above it
+local function root(name)
+  app.stack = name == "title" and {} or { "title" }
+  if name == "modes" then app.stack[#app.stack + 1] = "sports" end
+  switch(name)
+end
+app.toastT = 0
+local function toast(s) app.toastText, app.toastT = s, 2.0 end
 
 local actions = {
   bowling = function() go("bowling") end,
@@ -411,26 +452,24 @@ local actions = {
   rescan = function() I.jc2.scan(false); I.jc2.scan(true) end,
   wizard = function() go("wizard") end,
   recheck = function() screens.check.enter() end,
-  uselevel = function() local c = ctrl(); c.level = app.levelSel; c.profile.level = app.levelSel; I.saveProfile(c); go("test") end,
+  uselevel = function() local c = ctrl(); c.level = app.levelSel; c.profile.level = app.levelSel; I.saveProfile(c); back() end,
   redo = function() cal.wizardRedo(app.wiz) end,
-  back = function() app.firstCal = nil; go("test") end,
+  back = function() app.firstCal = nil; back() end,
   reset = function() ctrl().profile.buttons = {} end,
-  save = function() I.saveProfile(ctrl()); go("test") end,
+  save = function() I.saveProfile(ctrl()); back() end,
 }
 
 local function activate(i)
-  if i == 0 then
-    if app.screen == "test" then love.event.quit() else go("test") end
-    return
-  end
+  if i == 0 then back(); return end
   local h = app.hits[i]
   if h and actions[h.action] then actions[h.action]() end
 end
 
 local function navigate(nav)
   if screens[app.screen].nav then screens[app.screen].nav(nav); return end
-  -- B goes back from setup screens; on the test screen it does nothing (B/ZR is a game button)
-  if nav.b and not app.listening and app.screen ~= "test" then activate(0); return end
+  -- B goes back from setup screens; on the motion test B/ZR is the swing button, so only
+  -- Esc / the keyboard goes back there
+  if nav.b and not app.listening and (app.screen ~= "test" or nav.b == true) then activate(0); return end
   if app.screen == "check" and app.report then
     if nav.up then app.levelSel = math.max(1, app.levelSel - 1) end
     if nav.down then app.levelSel = math.min(4, app.levelSel + 1) end
@@ -473,22 +512,58 @@ local function navigate(nav)
 end
 
 ------------------------------------------------------------ LÖVE callbacks
+-- settings that take effect right away
+local function applySetting(k, v)
+  if k == "fullscreen" then pcall(love.window.setFullscreen, v and true or false); U.resize(lg.getDimensions())
+  elseif k == "quality" then gfx.MSAA = (v == "low") and 0 or 4 end
+end
+
+-- keep listening for saved Joy-Cons in the background (they connect when SYNC is pressed)
+local function updateListening()
+  local jc = I.jc2
+  if not jc.available or app.screen == "pair" then return end
+  local want = settings.get("autoConnect") and #settings.get("saved") > 0
+  if want ~= (jc.background or false) then jc.listen(want) end
+end
+
 function love.load()
+  settings.load()
+  applySetting("quality", settings.get("quality"))
+  if settings.get("fullscreen") then applySetting("fullscreen", true) end
   U.resize(lg.getDimensions())
+  Snd.init()
   I.init()
 
   app.sel = (#I.list > 1) and 2 or 1 -- prefer a real controller over the mouse
   app.focus = nil
-  -- what a game screen may use from the app
+  -- what the game screens and menus may use from the app
   local env = {
-    ctrl = ctrl, go = go, quit = function() love.event.quit() end,
+    ctrl = ctrl, go = go, back = back, root = root, toast = toast, I = I,
+    quit = function() love.event.quit() end,
     useMouse = function() for i, c in ipairs(I.list) do if c == I.mouse then app.sel = i end end end,
     use = function(c) for i, v in ipairs(I.list) do if v == c then app.sel = i end end end,
     list = function() return I.list end,
+    startBowling = function(opts) bowling.newGame(app.env, opts); go("bowling") end,
+    applySetting = applySetting,
   }
+  app.env = env
+  menus.init(env)
   screens.bowling.enter = function() bowling.enter(env) end
+  screens.bowling.resume = function() bowling.resume() end
+  screens.bowling.leave = function() bowling.silence() end
   -- a newly connected controller becomes the one in play
-  I.onNew = function(c) for i, v in ipairs(I.list) do if v == c then app.sel = i end end end
+  I.onNew = function(c)
+    Snd.ui("connect")
+    for i, v in ipairs(I.list) do if v == c then app.sel = i end end
+    toast(c.name .. " connected")
+  end
+  -- a saved Joy-Con showed up: connect it
+  I.jc2.onFound = function(entry)
+    if settings.get("autoConnect") and settings.findSaved(settings.get("saved"), entry.addr) then
+      I.jc2.connect(entry)
+      toast("Connecting " .. entry.name .. "…")
+    end
+  end
   if screens[app.screen].enter then screens[app.screen].enter() end
 end
 function love.resize(w, h) U.resize(w, h) end
@@ -496,6 +571,8 @@ function love.quit() I.shutdown() end
 function love.update(dt)
   dt = math.min(dt, 0.05)
   I.update(dt)
+  updateListening()
+  if app.toastT > 0 then app.toastT = app.toastT - dt end
   if screens[app.screen].update then screens[app.screen].update(dt) end
   if not app.listening then navigate(I.navPressed()) else I.navPressed() end
   I.endFrame()
@@ -511,6 +588,11 @@ function love.draw()
     U.begin()
   end
   sc.draw()
+  if app.toastT > 0 and app.toastText and app.screen ~= "bowling" then
+    local tw = U.textWidth(app.toastText, 16) + 48
+    U.rect(640 - tw / 2, 600, tw, 42, 21, C.ink)
+    U.text(app.toastText, 640 - tw / 2, 611, 16, C.card, "center", tw)
+  end
   local left = I.jc2.logTick and I.jc2.logTick()
   if left then
     U.rect(340, 20, 600, 44, 22, C.warnSoft)
@@ -575,3 +657,6 @@ function love.mousereleased(x, y)
     c.drag = nil
   end
 end
+
+-- for tests: which screen is showing, and the screen stack
+return { state = function() return app end, settings = settings }

@@ -102,6 +102,10 @@ local function bleConnected(entry)
     I.saveProfile(c)
   end
   c:recentre()
+  -- remember it, so it connects by itself next time
+  local settings = require("shells.love.settings")
+  settings.remember(settings.get("saved"), entry.addr, entry.pid, entry.name, os.time())
+  settings.save()
   if I.onNew then I.onNew(c) end
   return c
 end

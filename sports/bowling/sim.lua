@@ -24,7 +24,64 @@ function Sim.new(tuning, layout)
   w:addPlane({ 0, 0, -1 }, L.deckEnd, { mu = 0.4, e = 0.1, name = "pitfront", ymax = -0.005 })
   self.pins = {}
   self:rack()
+  -- impacts become sound events (the shells play them; nothing here makes noise)
+  self.events, self.lastHit = {}, {}
+  w.onContact = function(x, y, j, c) self:contact(x, y, c) end
   return self
+end
+
+-- what made the noise: kinds of sound event, with the closing speed (m/s) that counts as a
+-- full-volume hit for each
+Sim.HIT_REF = { ball_drop = 2.0, ball_pin = 7.0, pin_pin = 4.0, pin_floor = 3.0, pin_wall = 3.0,
+  pit = 5.0, pin_pit = 3.0 }
+local MIN_HIT = 0.35   -- slower than this is resting / rocking, not a hit
+local REPEAT = 0.07    -- the same two things can't make the same noise again sooner than this
+
+local PLANE_KIND = { lane = "floor", kickback = "wall", pit = "pit", cushion = "pit", pitfront = "pit" }
+
+function Sim:contact(a, b, c)
+  local speed = -(c.vn0 or 0)
+  if speed < MIN_HIT then return end
+  local kind, key
+  if a.kind == nil then -- a is a plane, b a body
+    local surf = PLANE_KIND[a.name]
+    if not surf then return end
+    if b.kind == "ball" then
+      if surf == "floor" then kind = "ball_drop" elseif surf == "pit" then kind = "pit" else return end
+    elseif surf == "floor" then kind = "pin_floor"
+    elseif surf == "wall" then kind = "pin_wall"
+    else kind = "pin_pit" end
+    key = a.name .. (b.id or 0)
+  else
+    if a.kind == "ball" or b.kind == "ball" then kind = "ball_pin" else kind = "pin_pin" end
+    local ia, ib = a.id or 0, b.id or 0
+    key = math.min(ia, ib) .. ":" .. math.max(ia, ib)
+  end
+  local t = self.t
+  if self.lastHit[key] and t - self.lastHit[key] < REPEAT then return end
+  self.lastHit[key] = t
+  local e = self.events
+  e[#e + 1] = { kind = kind, speed = speed, x = c.p[1], y = c.p[2], z = c.p[3], t = t,
+    level = math.min(1, speed / Sim.HIT_REF[kind]) }
+end
+
+-- hand over (and clear) the sound events since the last call
+function Sim:takeEvents()
+  local e = self.events
+  self.events = {}
+  return e
+end
+
+-- what the ball is doing, for the rolling sound: "lane", "gutter", "air", "pit" or nil
+function Sim:ballSound()
+  local b = self.ball
+  if not b or self.state ~= "rolling" then return nil end
+  local L, r = setup.lane, self.tun.ballRadius
+  local speed = math.sqrt(b.v[1] ^ 2 + b.v[3] ^ 2)
+  if b.pos[3] < -L.deckEnd then return "pit", speed, b.pos[1] end
+  if self.gutter then return "gutter", speed, b.pos[1] end
+  if b.pos[2] > r + 0.012 then return "air", speed, b.pos[1] end
+  return "lane", speed, b.pos[1]
 end
 
 local function pinInertia(mass)
@@ -103,6 +160,8 @@ function Sim:throw(th)
   self.t, self.deckT, self.gutter, self.stopT = 0, nil, nil, 0
   self.throwInfo = th
   self.firstHit = nil
+  self.gutterLanded = nil
+  self.events, self.lastHit = {}, {}
 end
 
 function Sim:stepOnce()
@@ -122,6 +181,7 @@ function Sim:stepOnce()
   if not self.gutter and b.pos[3] < 0 and b.pos[3] > -L.length + 0.2 and math.abs(b.pos[1]) > L.halfWidth then
     self.gutter = b.pos[1] > 0 and 1 or -1
     b.collide = false
+    self.events[#self.events + 1] = { kind = "ball_drop", speed = 1, x = b.pos[1], y = b.pos[2], z = b.pos[3], t = self.t, level = 0.45 }
   end
   if self.gutter then
     local r = T.ballRadius
@@ -131,7 +191,13 @@ function Sim:stepOnce()
       b.pos[2], b.v[2] = r - L.gutterDepth, 0
       if b.v[3] > -1.5 then b.v[3] = -1.5 end -- gutter balls never stall in the channel
     else
-      b.pos[2] = math.max(-L.pitDepth + r, b.pos[2] + b.v[2] * DT)
+      local y = b.pos[2] + b.v[2] * DT
+      if y <= -L.pitDepth + r and not self.gutterLanded then
+        -- the gutter ball doesn't collide with anything, so make its landing noise here
+        self.gutterLanded = true
+        self.events[#self.events + 1] = { kind = "pit", speed = 3, x = b.pos[1], y = b.pos[2], z = b.pos[3], t = self.t, level = 0.6 }
+      end
+      b.pos[2] = math.max(-L.pitDepth + r, y)
       b.v[2] = b.v[2] - 9.81 * DT
     end
     b.pos[3] = math.max(b.pos[3], -L.pitBack + r)

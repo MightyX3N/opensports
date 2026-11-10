@@ -40,7 +40,7 @@ Fixes are saved per controller in LÖVE's save folder (`input/<guid>.lua`).
 
 ## Testing
 
-Core tests run under LuaJIT: `python3 tools/runlua.py tests/test_core.lua` (needs `pip install lupa`), or `LUA_PATH="./?.lua;;" luajit tests/test_bowling.lua`.
+Core tests run under LuaJIT: `python3 tools/runlua.py tests/test_core.lua` (needs `pip install lupa`), or `LUA_PATH="./?.lua;;" luajit tests/test_bowling.lua`. `tests/test_character.lua` checks the glTF loader and animations against the robot's real files.
 
 `tools/autotest/play_bowling.lua` plays a whole game of bowling headless with the mouse and a simulated Joy-Con 2 (33 motion reports a second, like the real one), checks every control and saves screenshots and a log:
 
@@ -94,17 +94,20 @@ Every sport also gets a **Custom** mode with in-game sliders for its tuning tabl
 - **Asset packs** replace models, textures and sounds by named slot (glTF, PNG, OGG).
 - **Avatar styles** add new character styles that every sport can use.
 
-## Avatars
+## Characters
 
-Each player picks an avatar style. Three ship with the game, and add-ons can add more:
+The bowler is the robot mannequin from [KayKit Character Animations](https://kaylousberg.itch.io/) by Kay Lousberg (CC0), moved by the pack's own animations (idle, walk, cheer and more).
+During a throw the right arm follows your controller instead.
 
-- **Bean** – big round head, bean body, floating hands
-- **Peg** – peg-doll capsule body, floating hands, no legs
-- **Sporty** – about 3.5 heads tall with full arms and legs
+Characters are ordinary glTF files (`.glb`) loaded by `core/gltf.lua` and animated by `core/anim.lua`, so any character made for the same KayKit skeleton can replace it and use every animation.
 
-Every style follows the same rig contract: head, torso, hands, feet and an equipment socket.
-Sport animations move hand and foot targets, and each style reaches them in its own way (floating hands are placed directly, full arms use IK).
-That way any style works in any sport, and players with different styles can share a match.
+## Sounds
+
+The bowling hall (ball drop, roll, pin crash and clacks, background lanes) is cut from real recordings by `tools/sfx/make_bowling.py`; the sources and their licences are in `tools/sfx/sources/`.
+Menu sounds, result tunes and applause are synthesised by `tools/sfx/make_sounds.py`.
+Sound is placed in 3D: the ears are at the camera, each hit plays where it happened (the physics reports every collision with its speed) and the roll follows the ball. The files are dry and the game adds one shared room echo.
+The pin crash is a recorded strike whose volume follows how many pins are actually moving, with single clacks for everything else.
+`tools/autotest/record_audio.lua` records a few balls of play to a WAV file without a sound card.
 
 ## Announcer
 

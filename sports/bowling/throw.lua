@@ -21,9 +21,12 @@ R.STILL_RATE = 0.9      -- rad/s: "holding still"
 R.STILL_TIME = 0.25     -- s of stillness that counts as the ready pose
 R.BACK_RATE = 1.8       -- rad/s backwards that starts the swing
 R.MIN_FORWARD = 1.6     -- rad/s forwards needed for a real throw
-R.ARM = 0.75            -- m from shoulder to ball: forward arm speed × this = ball speed
-R.FULL_TWIST = 1.1      -- rad of wrist twist during the forward swing for full hook
-R.TWIST_DEAD = 0.18     -- rad of twist ignored (nobody swings perfectly straight)
+-- forward arm speed (rad/s at its peak) that gives the slowest and the fastest ball:
+-- measured on real Joy-Con 2 swings, a relaxed throw peaks around 7, a normal one around
+-- 15 and a hard one around 22
+R.PEAK_SLOW, R.PEAK_FAST = 4, 22
+R.FULL_TWIST = 1.3      -- rad of wrist twist during the forward swing for full hook
+R.TWIST_DEAD = 0.30     -- rad of twist ignored (nobody swings perfectly straight)
 
 function R.new(ctrl, tun)
   return setmetatable({ ctrl = ctrl, tun = tun, phase = "idle", lastT = -1, arm = -math.pi / 2 }, R)
@@ -51,7 +54,9 @@ end
 
 local function throwEvent(self, power, hook, aim)
   self.phase = "idle"
-  return { type = "throw", power = m.clamp(power, 0, 1), hook = m.clamp(hook, -1, 1), aim = aim or 0 }
+  return { type = "throw", power = m.clamp(power, 0, 1), hook = m.clamp(hook, -1, 1), aim = aim or 0,
+    -- what was read, for the on-screen readout and the throw log
+    info = { peak = self.peak, twist = self.twist, releaseYaw = self.releaseYaw, trace = self.trace } }
 end
 
 -- full motion (and gyro-as-pointer): reads every new sample, so a 33 Hz controller
@@ -90,11 +95,13 @@ function R:updateMotion()
       if self.stillT >= R.STILL_TIME then
         c:recentre(R.headingYaw(c.raw))
         self.phase = "ready"
+        self.trace = {}
         return { type = "ready" }
       end
       -- already swinging without pausing: go anyway, the last recentre stays
       if pitchRate(h.orient, h.gyro) < -R.BACK_RATE * 1.5 and self.waitT > 0.15 then
         self.phase, self.peak, self.twist = "swing", 0, 0
+        self.trace = {}
         return { type = "swing" }
       end
     end
@@ -104,6 +111,9 @@ function R:updateMotion()
     for i, h in ipairs(newSamples) do
       local dt = sdt(i)
       local pr = pitchRate(h.orient, h.gyro)
+      if self.trace and #self.trace < 400 then
+        self.trace[#self.trace + 1] = { h.t, h.gyro[1], h.gyro[2], h.gyro[3], h.orient[1], h.orient[2], h.orient[3], h.orient[4], pr }
+      end
       if self.phase == "ready" and (pr < -R.BACK_RATE or pr > R.BACK_RATE * 1.5) then
         self.phase, self.peak, self.twist = "swing", 0, 0
         ev = { type = "swing" }
@@ -119,10 +129,8 @@ function R:updateMotion()
     end
     if not held then
       if self.phase == "swing" and self.peak >= R.MIN_FORWARD then
-        -- ball speed follows the hand: angular speed of the arm × arm length
-        local T = self.tun
-        local speed = m.clamp(self.peak * R.ARM, T.minSpeed, T.maxSpeed)
-        local power = (speed - T.minSpeed) / (T.maxSpeed - T.minSpeed)
+        -- ball speed follows how fast the arm comes forward
+        local power = m.clamp((self.peak - R.PEAK_SLOW) / (R.PEAK_FAST - R.PEAK_SLOW), 0, 1)
         local tw = self.twist
         local hook = 0
         if math.abs(tw) > R.TWIST_DEAD then

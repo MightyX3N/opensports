@@ -27,7 +27,7 @@ function P.newWorld(opts)
     sleepAng = 0.25,       -- rad/s
     sleepTime = 0.35,      -- s below both thresholds before a body sleeps
     t = 0,
-    onContact = nil,       -- function(a, b, impulse) for sounds / effects; b may be a plane
+    onContact = nil,       -- function(a, b, impulse, contact) for sounds / effects; a may be a plane; contact.vn0 = closing speed
   }, P)
 end
 
@@ -205,6 +205,7 @@ function P:step(dt)
     c.k2 = effMass(a, b, c.ra, c.rb, c.t2)
     local rel = m.sub(velAt(b, c.rb), velAt(a, c.ra))
     local vn = m.dot(rel, c.n)
+    c.vn0 = vn -- approach speed before solving (negative = closing): how hard the hit was
     c.bias = 0
     if vn < -0.6 then c.bias = -c.e * vn end -- bounce only on real impacts, not resting contact
     c.bias = c.bias + self.beta * max(0, c.depth - self.slop) / dt

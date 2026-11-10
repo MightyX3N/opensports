@@ -69,6 +69,22 @@ function B.scan(on)
   B.scanning = on
 end
 
+-- listen in the background (saved controllers connect themselves when they show up).
+-- Restarting the watcher also lets a controller that was seen before be reported again.
+function B.listen(on)
+  if not B.available then return end
+  B.background = on
+  lib.osble_scan(0)
+  if on then lib.osble_scan(1) end
+  B.scanning = on
+end
+
+-- is this address already connected or connecting?
+function B.busy(addr)
+  for _, e in pairs(B.pads) do if e.addr == addr then return true end end
+  return false
+end
+
 function B.connect(entry)
   if not B.available or entry.id then return end
   entry.id = lib.osble_connect(entry.addr, entry.pid)
@@ -103,6 +119,8 @@ function B.update(onConnected, onDisconnected)
     if e.type == 1 then -- found
       local entry = { addr = e.addr, pid = e.pid, rssi = e.rssi, name = B.NAMES[e.pid] or string.format("Switch 2 controller %04X", e.pid), state = "found" }
       B.found[#B.found + 1] = entry
+      -- a saved controller woke up (SYNC pressed): connect it straight away
+      if B.onFound and not B.busy(e.addr) then B.onFound(entry) end
     elseif e.type == 2 then -- connected
       local entry = B.pads[e.id]
       if entry then
@@ -118,6 +136,8 @@ function B.update(onConnected, onDisconnected)
         if entry.ctrl then onDisconnected(entry.ctrl) end
         lib.osble_disconnect(e.id)
         B.pads[e.id] = nil
+        -- report it again when it comes back
+        if B.background then B.listen(true) end
       end
     elseif e.type == 4 then
       local entry = B.pads[e.id]

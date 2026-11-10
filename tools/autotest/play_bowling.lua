@@ -10,6 +10,9 @@ local m = require("core.math")
 local motion = require("core.motion")
 local I = require("shells.love.input")
 local bowling = require("shells.love.bowling")
+local App = require("shells.love.app")
+local menus = require("shells.love.menus")
+local function screen() return App.state().screen end
 local G = 9.80665
 
 local simT = 0
@@ -78,7 +81,10 @@ local function waitUntil(f, limit)
   while not f() and simT < t do coroutine.yield() end
   return f()
 end
+local drawNow = 0 -- frames that must be drawn (screenshots); others are skipped to save time
 local function shot(name)
+  drawNow = 3
+  coroutine.yield()
   love.graphics.captureScreenshot(function(img)
     local f = io.open(outdir .. "/" .. name .. ".png", "wb")
     f:write(img:encode("png"):getString()); f:close()
@@ -110,7 +116,7 @@ local function jcThrow(opts)
   if opts.shotReady then shot(opts.shotReady) end
   rates((math.rad(-150) - fake.pitch) / 0.6, 0, 0.6)
   if opts.shotSwing then shot(opts.shotSwing) end
-  local fwdT = opts.fwdTime or 0.28
+  local fwdT = opts.fwdTime or 0.16
   rates((math.rad(0) - fake.pitch) / fwdT, (opts.twist or 0) / fwdT, fwdT)
   fake.buttons.b = false
   local thrown = waitUntil(function() return st().phase == "rolling" end, 1.0)
@@ -128,6 +134,7 @@ local function mouseThrow(dx)
   return waitUntil(function() return st().phase == "rolling" end, 0.5)
 end
 
+local reactShots = {}
 local function finishBall(tag)
   waitUntil(function() return st().phase == "result" end, 20)
   wait(0.3)
@@ -135,16 +142,55 @@ local function finishBall(tag)
   local th = g.sim.throwInfo or {}
   L("%-28s -> %-8s  x %+.2f angle %+.2f° speed %.1f m/s hook %+.2f   %s", tag, g.msg or "?", th.x or 0,
     math.deg(th.angle or 0), th.speed or 0, g.lastThrow and g.lastThrow.hook or 0, frameText())
+  -- the bowler's reaction (strike/spare = cheer, nothing hit = disappointed), once each
+  if g.react and not reactShots[g.react] then
+    reactShots[g.react] = true
+    check(waitUntil(function() return st().reacting end, 3), "the bowler reacts to " .. g.msg)
+    wait(0.7); shot("13_react_" .. g.react)
+  end
   waitUntil(function() return st().phase == "aim" or st().phase == "over" end, 5)
 end
 
 local function script()
   wait(1.0)
+  L("== menus")
+  check(screen() == "title", "the game starts on the title screen")
+  shot("00a_title")
+  key("return"); wait(0.3)
+  check(screen() == "sports", "A / Enter on the title opens sport select")
+  check(menus.focusedId() == "sport_bowling", "Bowling is focused first")
+  shot("00b_sports")
+  key("right"); wait(0.1)
+  check(menus.focusedId() == "sport_tennis", "D-pad moves the focus between sports")
+  key("return"); wait(0.2)
+  check(screen() == "sports" and App.state().toastText == "Tennis is coming soon", "sports that don't exist yet say coming soon")
+  key("left"); wait(0.1); key("return"); wait(0.3)
+  check(screen() == "modes", "Bowling opens the mode screen")
+  shot("00c_modes")
+  key("return"); wait(1.0)
+  check(screen() == "bowling", "Start begins a game of bowling")
+
   L("== bowling autotest")
   local g = st()
   check(g ~= nil and g.phase == "aim", "game starts on the lane, ready to aim")
   check(g.ctrl.kind == "mouse", "with no controller the mouse is in play")
   shot("01_start_mouse")
+
+  -- with no motion controller, the lane offers to connect a Joy-Con 2 right away
+  local hit = st().connectHit
+  check(hit ~= nil, "no controller: a Connect Joy-Con 2 button is on the lane")
+  if hit then
+    local cx, cy = hit.x + hit.w / 2, hit.y + hit.h / 2
+    love.mousepressed(cx, cy, 1); love.mousereleased(cx, cy, 1)
+    wait(0.2)
+    local t0 = st().t
+    wait(0.3)
+    check(st().t == t0, "clicking it opens the Joy-Con 2 connect screen")
+    shot("01b_connect_screen")
+    key("escape"); wait(0.3)
+    check(st().t > t0, "Back / Esc returns to the lane")
+    check(st().phase == "aim" and #st().rules.frames == 0, "and the game is still where it was")
+  end
 
   -- 1st ball: mouse flick, slightly right
   local ok = mouseThrow(3)
@@ -156,8 +202,13 @@ local function script()
 
   -- connect the simulated Joy-Con 2
   local c = addFake()
+  -- like a profile saved by an older motion check with "stick as pointer"
+  c.level = motion.STICK_POINTER
   wait(0.6)
   check(st().ctrl == c, "a newly connected Joy-Con 2 takes over")
+  -- picking it up moves it: the game sees motion and bowls with full motion
+  poseTo(math.rad(60), 0.25); poseTo(math.rad(80), 0.25); wait(0.2)
+  check(c.level == motion.FULL, "a Joy-Con sending motion bowls with full motion, even with an old saved level")
   shot("04_aim_joycon2")
 
   -- move right, switch to turning, turn a bit, switch back
@@ -184,6 +235,16 @@ local function script()
   shot("06_pause")
   key("escape"); wait(0.1)
   check(not st().pause, "Esc closes it again")
+  -- pause → Settings → back carries on with the same game
+  local framesBefore = #st().rules.frames
+  fake.buttons.plus = true; wait(0.05); fake.buttons.plus = false; wait(0.2)
+  for _ = 1, 4 do key("down"); wait(0.05) end
+  key("return"); wait(0.3)
+  check(screen() == "settings", "pause → Settings opens the settings")
+  shot("06b_settings")
+  key("escape"); wait(0.3)
+  check(screen() == "bowling" and not st().pause and #st().rules.frames == framesBefore,
+    "Back from settings returns to the same game, unpaused")
 
   -- pressing ZR and letting go without a swing must not throw
   fake.buttons.b = true; wait(0.6); fake.buttons.b = false; wait(0.3)
@@ -197,9 +258,10 @@ local function script()
 
   -- the rest of the game with varied swings
   local styles = {
-    { twist = 0.0, fwdTime = 0.25 }, { twist = 0.6, fwdTime = 0.25 }, { twist = -0.5, fwdTime = 0.3 },
-    { twist = 0.0, fwdTime = 0.32 }, { twist = 0.9, fwdTime = 0.22 }, { twist = 0.3, fwdTime = 0.45 },
-    { twist = 0.0, fwdTime = 0.6 },
+    -- forward swing times like real Joy-Con 2 throws (0.12 s hard … 0.35 s relaxed)
+    { twist = 0.0, fwdTime = 0.16 }, { twist = 0.6, fwdTime = 0.16 }, { twist = -0.5, fwdTime = 0.18 },
+    { twist = 0.0, fwdTime = 0.22 }, { twist = 0.9, fwdTime = 0.13 }, { twist = 0.3, fwdTime = 0.28 },
+    { twist = 0.0, fwdTime = 0.35 },
   }
   local n, shots = 0, 0
   while st().phase ~= "over" and n < 40 do
@@ -215,19 +277,59 @@ local function script()
   wait(0.5); shot("11_game_over")
   L("final: %s", frameText())
 
-  -- game over menu: Controllers goes to the controller test screen
+  -- game over → Sport select
   key("down"); wait(0.1); key("return"); wait(0.4)
+  check(screen() == "sports", "game over → Sport select")
+  -- Controllers and Settings from the sport select
+  for _ = 1, 3 do key("down"); wait(0.05) end
+  check(menus.focusedId() == "back", "D-pad reaches the Back button")
+  key("right"); wait(0.05)
+  check(menus.focusedId() == "Controllers", "and the Controllers button next to it")
+  key("return"); wait(0.3)
+  check(screen() == "controllers", "Controllers opens")
   shot("12_controllers")
-  -- and its remap screen shows the new buttons
-  love.keypressed("tab")
-  wait(0.2)
+  key("escape"); wait(0.3)
+  check(screen() == "sports", "Back returns to sport select")
+  for _ = 1, 3 do key("down"); wait(0.05) end
+  key("right"); wait(0.05); key("right"); wait(0.05)
+  check(menus.focusedId() == "Settings", "Settings button")
+  key("return"); wait(0.3)
+  check(screen() == "settings", "Settings opens")
+  local S = App.settings
+  local before = S.get("swing")
+  key("down"); wait(0.05); key("down"); wait(0.05); key("down"); wait(0.05)
+  check(menus.focusedId() == "set_swing", "down to Swing strength")
+  key("right"); wait(0.1)
+  check(S.get("swing") ~= before, "right changes the setting (" .. tostring(before) .. " -> " .. tostring(S.get("swing")) .. ")")
+  shot("13_settings")
+  key("left"); wait(0.1)
+  check(S.get("swing") == before, "left changes it back")
+  key("escape"); wait(0.3); key("escape"); wait(0.3)
+  check(screen() == "title", "Back twice returns to the title screen")
   L("done, %d failure(s)", failures)
   logf:close()
   love.event.quit(failures == 0 and 0 or 1)
 end
 
 ------------------------------------------------------------------ hook into the app
-local origLoad, origUpdate = love.load, love.update
+local origLoad, origUpdate, origDraw = love.load, love.update, love.draw
+-- an error anywhere ends the run with the message in the log (instead of LÖVE's error screen)
+love.errorhandler = function(msg)
+  L("LUA ERROR: %s\n%s", tostring(msg), debug.traceback())
+  logf:close()
+  os.exit(2)
+end
+-- the 3D scene is slow under software rendering (CI / xvfb): draw only what we capture,
+-- plus every 30th frame so drawing code still runs through every phase of the game
+local frameNo = 0
+love.draw = function()
+  frameNo = frameNo + 1
+  -- menus register their buttons while drawing, so menu screens always draw
+  if drawNow > 0 or frameNo % 30 == 0 or App.state().screen ~= "bowling" then
+    drawNow = math.max(0, drawNow - 1)
+    origDraw()
+  end
+end
 love.load = function(...)
   origLoad(...)
   love.window.setVSync(0)

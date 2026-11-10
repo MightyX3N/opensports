@@ -8,8 +8,8 @@ T.base = {
   minSpeed = 3.0, maxSpeed = 9.5,    -- m/s down the lane for power 0 and 1
   releaseHeight = 0.12,              -- centre height when it leaves the hand
   maxHook = 10,                      -- rad/s of side rotation at full twist
-  aimFromSwing = 0.35,               -- share of the controller's sideways angle at release that steers the ball
-  maxSwingAim = math.rad(3.5),       -- cap on that steering
+  aimFromSwing = 0,               -- share of the controller's sideways angle at release that steers the ball
+  maxSwingAim = math.rad(1.6),       -- cap on that steering
 
   -- lane friction: oiled front, dry back end, as on a real lane
   oilLength = 12.0,                  -- m from the foul line

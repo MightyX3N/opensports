@@ -37,6 +37,8 @@ jobs:
         python tools/runlua.py tests/test_jc2_native.lua
         python tools/runlua.py tests/test_dsu.lua
         python tools/runlua.py tests/test_bowling.lua
+        python tools/runlua.py tests/test_character.lua
+        python tools/runlua.py tests/test_settings.lua
 
     - name: Cache LÖVE build
       id: cache

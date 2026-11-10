@@ -119,7 +119,8 @@ local function swingThrow(opts)
   for _ = 1, rate * 0.5 do step(0, 0, true) end                  -- ready pose, button held
   local back = math.rad(-150) - pitch
   for _ = 1, rate * 0.6 do step(back / 0.6, 0, true) end         -- backswing
-  local fwdT = opts.fwdTime or 0.25
+  -- default forward swing: 150° in 0.16 s, about 16 rad/s, a normal throw on a real Joy-Con 2
+  local fwdT = opts.fwdTime or 0.16
   local fwd = math.rad(0) - pitch
   for _ = 1, math.floor(rate * fwdT) do step(fwd / fwdT, (opts.twist or 0) / fwdT, true) end
   step(0, 0, false)                                              -- let go
@@ -132,7 +133,7 @@ do
   local th = find(evs, "throw")
   ok(find(evs, "ready") ~= nil, "holding still at the chest counts as the ready pose")
   ok(th ~= nil, "a back-and-forward swing throws the ball")
-  ok(th and th.power > 0.6, "a fast swing is a strong throw (" .. (th and string.format("%.2f", th.power) or "-") .. ")")
+  ok(th and th.power > 0.55, "a normal swing is a good strong throw (" .. (th and string.format("%.2f", th.power) or "-") .. ")")
   ok(th and math.abs(th.hook) < 0.15, "no wrist twist, no hook")
   ok(th and math.abs(th.aim) < math.rad(1), "straight swing aims straight")
   local slow = find(swingThrow({ fwdTime = 0.7 }), "throw")
@@ -143,7 +144,9 @@ do
   ok(left and left.hook < -0.5, "twisting left hooks left")
   local turned = find(swingThrow({ heading = math.rad(40) }), "throw")
   ok(turned and math.abs(turned.aim) < math.rad(1.5), "the ready pose re-centres: standing turned 40° still bowls straight")
-  local jc2 = find(swingThrow({ rate = 33, twist = 1.0 }), "throw")
+  ok(th and th.aim == 0 and turned and turned.aim == 0 and right and right.aim == 0,
+    "where the controller points at release doesn't steer the ball (aim comes from standing and turning)")
+  local jc2 = find(swingThrow({ rate = 33, twist = 1.0, fwdTime = 0.18 }), "throw")
   ok(jc2 and jc2.power > 0.5 and jc2.hook > 0.3, "works at Joy-Con 2's 33 reports a second")
 end
 do -- letting go without swinging does not throw
@@ -184,6 +187,37 @@ do -- mouse flick
   ok(ev.type == "throw" and ev.power > 0.5 and ev.hook > 0, "mouse: drag down and flick up-right throws with a right hook")
   local ev2 = tr:gesture({ { x = 0, y = 0, t = 0 }, { x = 0, y = 5, t = 0.1 }, { x = 0, y = 2, t = 0.2 } })
   ok(ev2.type == "cancel", "mouse: a tiny wiggle doesn't throw")
+end
+
+-- sound events from the pins
+local function soundRun(th)
+  local s = Sim.new(T.get("arcade"))
+  s:throw(th)
+  local kinds, states, worst = {}, {}, 0
+  while s.state == "rolling" and s.t < 20 do
+    s:stepOnce()
+    if s:finished() then s.state = "done" end
+    for _, e in ipairs(s:takeEvents()) do
+      kinds[e.kind] = (kinds[e.kind] or 0) + 1
+      if e.level < 0 or e.level > 1 then worst = 1 end
+    end
+    local st = s:ballSound()
+    if st then states[st] = true end
+  end
+  return kinds, states, worst
+end
+do
+  local k, st, bad = soundRun({ x = 0.05, angle = 0, speed = 8, hook = 0.5 })
+  ok(k.ball_drop == 1, "sound: the ball lands on the lane once")
+  ok((k.ball_pin or 0) >= 1 and (k.pin_pin or 0) >= 5 and (k.pin_floor or 0) >= 3, "sound: a pocket hit makes ball-pin, pin-pin and pin-floor hits")
+  ok((k.pin_pin or 0) < 60, "sound: hits are not repeated every step")
+  ok(bad == 0, "sound: hit levels stay within 0..1")
+  ok(st.lane and st.pit and not st.gutter, "sound: the ball rolls on the lane, then drops into the pit")
+  local k2, st2 = soundRun({ x = 0.4, angle = -0.03, speed = 7 })
+  ok(st2.gutter and not k2.ball_pin and (k2.pit or 0) >= 1, "sound: a gutter ball rolls in the gutter and lands in the pit")
+  local s = Sim.new(T.get("arcade"))
+  for _ = 1, 240 do s:stepOnce() end
+  ok(#s:takeEvents() == 0, "sound: a standing rack is silent")
 end
 
 print(string.format("%d passed, %d failed", passes, fails))
